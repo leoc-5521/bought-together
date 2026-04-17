@@ -220,7 +220,7 @@ def get_stats():
 def dashboard(
     date_from: Optional[str] = Query(None),
     date_to:   Optional[str] = Query(None),
-    limit:     int           = Query(25),
+    limit:     int           = Query(50),
 ):
     if not orders_map:
         raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
@@ -232,30 +232,6 @@ def dashboard(
     total_orders = len(filtered_orders)
     if total_orders == 0:
         return {"total_orders": 0, "top_products": [], "top_pairs": []}
-
-    # ── Top products
-    product_total: dict[str, int] = defaultdict(int)
-    product_multi: dict[str, int] = defaultdict(int)
-    product_data:  dict[str, dict] = {}
-
-    for order in filtered_orders:
-        prods = order["products"]
-        multi = len(prods) > 1
-        for p in prods:
-            k = p["_key"]
-            product_total[k] += 1
-            if multi: product_multi[k] += 1
-            if k not in product_data:
-                product_data[k] = {"name": p["name"], "sku": get_p(p,"sku"), "id": get_p(p,"id"), "type": get_p(p,"type")}
-
-    top_products = sorted(
-        [{"name": product_data[k]["name"], "sku": product_data[k]["sku"],
-          "id": product_data[k]["id"], "type": product_data[k]["type"],
-          "total_orders": product_total[k], "copurchase_orders": product_multi[k],
-          "copurchase_pct": round(product_multi[k] / product_total[k] * 100, 1) if product_total[k] else 0}
-         for k in product_data],
-        key=lambda x: (-x["copurchase_pct"], -x["copurchase_orders"])
-    )[:limit]
 
     # ── Top pairs
     pair_count: dict[tuple, int] = defaultdict(int)
@@ -284,7 +260,7 @@ def dashboard(
         key=lambda x: (-x["pct"], -x["count"])
     )[:limit]
 
-    return {"total_orders": total_orders, "top_products": top_products, "top_pairs": top_pairs}
+    return {"total_orders": total_orders, "top_pairs": top_pairs}
 
 # ── Trios endpoint (separate, on-demand) ─────────────────────────
 @app.get("/trios")
@@ -298,40 +274,71 @@ def trios(
     df = parse_date(date_from) if date_from else None
     dt = parse_date(date_to)   if date_to   else None
 
-    filtered_orders = [o for o in orders_map.values() if in_date_range(o, df, dt)]
-    total_orders = len(filtered_orders)
-    if total_orders == 0:
-        return {"total_orders": 0, "top_trios": []}
+    # ── Step 1: assign each unique product key a small integer ID
+    # This lets us store tuples of ints instead of tuples of long strings,
+    # massively reducing memory usage for the counts dict.
+    key_to_id: dict[str, int] = {}
+    id_to_key: list[str] = []
 
+    def get_id(key: str) -> int:
+        if key not in key_to_id:
+            key_to_id[key] = len(id_to_key)
+            id_to_key.append(key)
+        return key_to_id[key]
+
+    # ── Step 2: count trios using integer tuples (much smaller in memory)
     trio_count: dict[tuple, int] = defaultdict(int)
-    trio_data:  dict[tuple, dict] = {}
+    total_orders = 0
 
-    for order in filtered_orders:
+    for order in orders_map.values():
+        if not in_date_range(order, df, dt):
+            continue
+        total_orders += 1
         prods = order["products"]
         if len(prods) < 3:
             continue
-        keys = sorted({p["_key"] for p in prods})
-        prod_lookup = {p["_key"]: p for p in prods}
-        for ka, kb, kc in combinations(keys, 3):
-            trio = (ka, kb, kc)
+        # Sort integer IDs — deduplicating products within the order
+        ids = sorted({get_id(p["_key"]) for p in prods})
+        for trio in combinations(ids, 3):
             trio_count[trio] += 1
-            if trio not in trio_data:
-                pa, pb, pc = prod_lookup[ka], prod_lookup[kb], prod_lookup[kc]
-                trio_data[trio] = {
-                    "product_a": {"name": pa["name"], "sku": get_p(pa,"sku"), "id": get_p(pa,"id"), "type": get_p(pa,"type")},
-                    "product_b": {"name": pb["name"], "sku": get_p(pb,"sku"), "id": get_p(pb,"id"), "type": get_p(pb,"type")},
-                    "product_c": {"name": pc["name"], "sku": get_p(pc,"sku"), "id": get_p(pc,"id"), "type": get_p(pc,"type")},
-                }
 
-    top_trios = sorted(
-        [{"product_a": trio_data[t]["product_a"], "product_b": trio_data[t]["product_b"],
-          "product_c": trio_data[t]["product_c"], "count": c, "pct": round(c / total_orders * 100, 1)}
-         for t, c in trio_count.items()],
-        key=lambda x: (-x["pct"], -x["count"])
-    )[:50]
+    if total_orders == 0:
+        return {"total_orders": 0, "top_trios": []}
 
-    # Free memory
-    del trio_count, trio_data, filtered_orders
+    # ── Step 3: find top 50 by count — no need to keep all trio_data in memory
+    top_raw = sorted(trio_count.items(), key=lambda x: -x[1])[:50]
+    del trio_count
+    gc.collect()
+
+    # ── Step 4: build a lookup of key -> product info from orders_map
+    # Only for the keys that appear in the top 50
+    needed_keys = set()
+    for (ia, ib, ic), _ in top_raw:
+        needed_keys.update([id_to_key[ia], id_to_key[ib], id_to_key[ic]])
+
+    prod_info: dict[str, dict] = {}
+    for order in orders_map.values():
+        for p in order["products"]:
+            k = p["_key"]
+            if k in needed_keys and k not in prod_info:
+                prod_info[k] = {"name": p["name"], "sku": get_p(p,"sku"),
+                                "id": get_p(p,"id"), "type": get_p(p,"type")}
+        if len(prod_info) == len(needed_keys):
+            break  # found everything we need
+
+    # ── Step 5: build final result
+    top_trios = []
+    for (ia, ib, ic), cnt in top_raw:
+        ka, kb, kc = id_to_key[ia], id_to_key[ib], id_to_key[ic]
+        top_trios.append({
+            "product_a": prod_info.get(ka, {"name": ka, "sku": "", "id": "", "type": ""}),
+            "product_b": prod_info.get(kb, {"name": kb, "sku": "", "id": "", "type": ""}),
+            "product_c": prod_info.get(kc, {"name": kc, "sku": "", "id": "", "type": ""}),
+            "count": cnt,
+            "pct": round(cnt / total_orders * 100, 1),
+        })
+
+    del top_raw, prod_info, key_to_id, id_to_key
     gc.collect()
 
     return {"total_orders": total_orders, "top_trios": top_trios}
