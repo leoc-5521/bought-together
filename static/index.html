@@ -15,7 +15,8 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; min-height: 100vh; font-size: 13px; line-height: 1.6; }
 
-  header { border-bottom: 1px solid var(--border); padding: 22px 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 100; }
+  /* ── Header ── */
+  header { border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 100; height: 60px; }
   .logo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
   .logo span { color: var(--accent); }
   .status-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
@@ -23,10 +24,23 @@
   .status-pill.loaded .dot { background: var(--accent); }
   .status-pill.loaded { color: var(--text); }
 
+  /* ── Tabs ── */
+  .tab-bar { display: none; border-bottom: 1px solid var(--border); padding: 0 32px; background: var(--bg); }
+  .tab-bar.visible { display: flex; }
+  .tab { padding: 14px 20px; font-size: 12px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Main layout ── */
   main { max-width: 1100px; margin: 0 auto; padding: 40px 32px 80px; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Shared components ── */
   .section-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
   .help-text { background: var(--surface); border-left: 3px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 14px 18px; font-size: 12px; color: var(--muted); margin-bottom: 24px; line-height: 1.8; }
   .help-text strong { color: var(--text); }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
   .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 32px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--surface); position: relative; }
   .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: #1a1f0f; }
@@ -41,6 +55,7 @@
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn.secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--surface2); }
+  .btn.sm { padding: 7px 14px; font-size: 11px; margin-top: 0; }
 
   #progress-bar-wrap { display: none; margin-top: 20px; }
   #progress-bar-wrap.visible { display: block; }
@@ -48,105 +63,42 @@
   .progress-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; width: 0%; }
   .progress-label { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: center; }
 
+  /* ── Stats bar ── */
   #stats-bar { display: none; gap: 1px; margin-bottom: 32px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
   #stats-bar.visible { display: flex; }
   .stat-box { flex: 1; background: var(--surface); padding: 16px 20px; text-align: center; }
   .stat-box .val { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 900; color: var(--accent); display: block; }
-  .stat-box .val.date-val { font-size: 14px; padding-top: 8px; line-height: 1.5; }
+  .stat-box .val.date-val { font-size: 13px; padding-top: 8px; line-height: 1.6; }
   .stat-box .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 
-  #search-section { display: none; margin-bottom: 32px; }
-  #search-section.visible { display: block; }
-  .search-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-  @media(max-width:600px){ .search-grid { grid-template-columns: 1fr; } }
+  /* ── Date range widget (shared) ── */
+  .date-range-wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .date-range-widget { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; overflow: hidden; transition: border-color 0.15s; flex: 1; min-width: 300px; }
+  .date-range-widget:focus-within, .date-range-widget.active { border-color: var(--accent); }
+  .date-range-widget .dr-label { padding: 10px 14px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; border-right: 1px solid var(--border); background: var(--surface2); }
+  .date-range-widget.active .dr-label { color: var(--accent); }
+  .date-range-widget .dr-part { display: flex; align-items: center; flex: 1; padding: 0 10px; }
+  .date-range-widget input[type="date"] { background: transparent; border: none; border-radius: 0; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; padding: 10px 0; width: 130px; flex-shrink: 0; }
+  .date-range-widget input[type="date"]:focus { outline: none; }
+  .date-range-widget input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
+  .date-range-widget .dr-sep { color: var(--muted); font-size: 11px; padding: 0 6px; }
+  .dr-clear { padding: 0 12px; background: none; border: none; border-left: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 18px; align-self: stretch; display: flex; align-items: center; transition: color 0.15s; }
+  .dr-clear.hidden { display: none; }
+  .dr-clear:hover { color: var(--danger); }
 
+  /* ── Mapper ── */
+  #mapper-section { display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:32px; }
+  #mapper-section.visible { display:block; }
+  #mapper-section h3 { font-family:'Fraunces',serif; font-size:16px; font-weight:600; margin-bottom:6px; }
+  #mapper-section p { color:var(--muted); font-size:12px; margin-bottom:20px; }
+  .mapper-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin-bottom:20px; }
   .field { display: flex; flex-direction: column; gap: 6px; position: relative; }
   .field label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
   .field input, .field select { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; transition: border-color 0.15s; width: 100%; }
   .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
   .field input::placeholder { color: var(--muted); }
 
-  /* ── Date range widget ── */
-  #date-filter-row { display: none; margin-bottom: 12px; }
-  #date-filter-row.visible { display: block; }
-
-  .date-range-widget {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    transition: border-color 0.15s;
-  }
-  .date-range-widget:focus-within { border-color: var(--accent); }
-
-  .date-range-widget .dr-label {
-    padding: 10px 14px;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    white-space: nowrap;
-    border-right: 1px solid var(--border);
-    background: var(--surface2);
-  }
-
-  .date-range-widget .dr-part {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    padding: 0 14px;
-    gap: 8px;
-  }
-  .date-range-widget .dr-part span {
-    font-size: 11px;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .date-range-widget input[type="date"] {
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    padding: 10px 0;
-    width: 140px;
-    flex-shrink: 0;
-  }
-  .date-range-widget input[type="date"]:focus { outline: none; }
-  .date-range-widget input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
-
-  .date-range-widget .dr-sep {
-    color: var(--muted);
-    font-size: 11px;
-    padding: 0 4px;
-  }
-
-  .dr-clear {
-    padding: 0 14px;
-    background: none;
-    border: none;
-    border-left: 1px solid var(--border);
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 18px;
-    height: 100%;
-    align-self: stretch;
-    display: flex;
-    align-items: center;
-    transition: color 0.15s;
-  }
-  .dr-clear:hover { color: var(--danger); }
-  .dr-clear.hidden { display: none; }
-
-  /* active state when dates are set */
-  .date-range-widget.active { border-color: var(--accent); }
-  .date-range-widget.active .dr-label { color: var(--accent); }
-
-  /* Searchable combo */
+  /* ── Combo ── */
   .combo-wrap { position: relative; }
   .combo-input { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 36px 10px 14px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; width: 100%; transition: border-color 0.15s; }
   .combo-input:focus { outline: none; border-color: var(--accent); }
@@ -165,49 +117,100 @@
   .combo-option.no-results { color: var(--muted); cursor: default; }
   .combo-option.no-results:hover { background: transparent; color: var(--muted); }
 
+  /* ── Search page ── */
+  .search-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media(max-width:600px){ .search-grid { grid-template-columns: 1fr; } }
   .search-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .search-actions .btn { margin-top: 0; }
 
+  #date-filter-row-search { display: none; margin-bottom: 12px; }
+  #date-filter-row-search.visible { display: block; }
+
+  /* ── Result cards ── */
   #results-section { display: none; }
   #results-section.visible { display: block; }
   .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
   .results-header h3 { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; }
   .results-header h3 span { color: var(--accent); }
   .results-meta { font-size: 11px; color: var(--muted); }
-
-  .product-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; transition: border-color 0.15s; animation: fadeUp 0.25s ease both; }
+  .product-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; transition: border-color 0.15s; animation: fadeUp 0.22s ease both; }
   .product-card:hover { border-color: #3a3a3a; }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
-  .product-card:nth-child(2){animation-delay:.05s}.product-card:nth-child(3){animation-delay:.1s}.product-card:nth-child(4){animation-delay:.15s}.product-card:nth-child(5){animation-delay:.2s}
-  .pc-rank { font-family:'Fraunces',serif; font-size:11px; color:var(--muted); margin-bottom:4px; }
-  .pc-name { font-family:'Fraunces',serif; font-size:16px; font-weight:600; margin-bottom:4px; }
-  .pc-meta { font-size:11px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap; }
-  .pc-right { text-align:right; min-width:90px; }
-  .pc-pct { font-family:'Fraunces',serif; font-size:32px; font-weight:900; color:var(--accent); line-height:1; margin-bottom:4px; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
+  .product-card:nth-child(2){animation-delay:.04s}.product-card:nth-child(3){animation-delay:.08s}.product-card:nth-child(4){animation-delay:.12s}.product-card:nth-child(5){animation-delay:.16s}
+  .pc-rank { font-size:10px; color:var(--muted); margin-bottom:3px; }
+  .pc-name { font-family:'Fraunces',serif; font-size:15px; font-weight:600; margin-bottom:3px; }
+  .pc-meta { font-size:11px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
+  .pc-right { text-align:right; min-width:80px; }
+  .pc-pct { font-family:'Fraunces',serif; font-size:30px; font-weight:900; color:var(--accent); line-height:1; margin-bottom:3px; }
   .pc-count { font-size:11px; color:var(--muted); }
-  .bar-wrap { height:4px; background:var(--border); border-radius:2px; margin-top:12px; overflow:hidden; grid-column:1/-1; }
+  .bar-wrap { height:3px; background:var(--border); border-radius:2px; margin-top:10px; overflow:hidden; grid-column:1/-1; }
   .bar-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 0.6s cubic-bezier(0.22,1,0.36,1); }
-
-  .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
-  .empty-state span { font-size:40px; display:block; margin-bottom:16px; }
-
-  #mapper-section { display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:32px; }
-  #mapper-section.visible { display:block; }
-  #mapper-section h3 { font-family:'Fraunces',serif; font-size:16px; font-weight:600; margin-bottom:6px; }
-  #mapper-section p { color:var(--muted); font-size:12px; margin-bottom:20px; }
-  .mapper-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin-bottom:20px; }
 
   #results-list { max-height:70vh; overflow-y:auto; padding-right:4px; }
   #results-list::-webkit-scrollbar { width:4px; }
   #results-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
+  /* ── Dashboard ── */
+  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .dash-header h2 { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; }
+  .dash-header h2 span { color: var(--accent); }
+
+  .dash-date-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
+  .dash-date-bar .field-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; }
+
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media(max-width:750px){ .dash-grid { grid-template-columns: 1fr; } }
+
+  .dash-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .dash-panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .dash-panel-header h3 { font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600; }
+  .dash-panel-header .panel-meta { font-size: 10px; color: var(--muted); }
+  .dash-panel-body { padding: 8px 0; max-height: 620px; overflow-y: auto; }
+  .dash-panel-body::-webkit-scrollbar { width: 4px; }
+  .dash-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Dashboard rows */
+  .dash-row { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .dash-row:last-child { border-bottom: none; }
+  .dash-row:hover { background: var(--surface2); }
+  .dash-rank { font-size: 11px; color: var(--muted); width: 24px; flex-shrink: 0; text-align: right; }
+  .dash-info { flex: 1; min-width: 0; }
+  .dash-name { font-family: 'Fraunces', serif; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dash-sub { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .dash-right { text-align: right; flex-shrink: 0; }
+  .dash-pct { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: var(--accent); line-height: 1; }
+  .dash-count { font-size: 10px; color: var(--muted); }
+  .dash-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .dash-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+
+  /* Pair rows */
+  .pair-row { padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .pair-row:last-child { border-bottom: none; }
+  .pair-row:hover { background: var(--surface2); }
+  .pair-top { display: flex; align-items: center; gap: 10px; }
+  .pair-rank { font-size: 11px; color: var(--muted); width: 24px; flex-shrink: 0; text-align: right; }
+  .pair-names { flex: 1; min-width: 0; }
+  .pair-a { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pair-plus { font-size: 10px; color: var(--muted); margin: 1px 0; }
+  .pair-b { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pair-right { text-align: right; flex-shrink: 0; }
+  .pair-pct { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: var(--accent); line-height: 1; }
+  .pair-count { font-size: 10px; color: var(--muted); }
+  .pair-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .pair-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+
+  .dash-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 12px; }
+  .dash-loading { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 12px; }
+
+  /* ── Toast & spinner ── */
   .toast { position:fixed; bottom:24px; right:24px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 20px; font-size:12px; opacity:0; transform:translateY(12px); transition:all 0.25s; z-index:999; max-width:320px; }
   .toast.show { opacity:1; transform:translateY(0); }
   .toast.error { border-color:var(--danger); color:var(--danger); }
   .toast.success { border-color:var(--accent); color:var(--accent); }
-
   #spinner { display:none; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
   #spinner.visible { display:inline-block; }
+  #dash-spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:6px; }
+  #dash-spinner.hidden { display:none; }
   @keyframes spin { to{transform:rotate(360deg)} }
 </style>
 </head>
@@ -221,9 +224,19 @@
   </div>
 </header>
 
+<!-- Tab bar (hidden until data loaded) -->
+<div class="tab-bar" id="tab-bar">
+  <div class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" id="tab-search" onclick="switchTab('search')">🔍 Search</div>
+</div>
+
 <main>
-  <div id="upload-section">
-    <div class="section-label">Step 1 · Upload your Shopify orders export</div>
+
+  <!-- ══════════════════════════════════════════════
+       UPLOAD PAGE (shown before data loaded)
+  ══════════════════════════════════════════════ -->
+  <div id="upload-page">
+    <div class="section-label">Get started · Upload your Shopify orders export</div>
     <div class="help-text">
       <strong>How to export from Shopify:</strong> Go to <em>Orders → Export → All orders → Export orders (CSV)</em>.<br>
       Large files with 70k+ orders work fine. <strong>Data is remembered between sessions</strong> — you won't need to re-upload every time.
@@ -239,15 +252,18 @@
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
       <div class="progress-label" id="progress-label">Uploading…</div>
     </div>
+
+    <div id="mapper-section">
+      <h3>Map your columns</h3>
+      <p>We couldn't auto-detect all required columns. Please match your spreadsheet columns to the fields below.</p>
+      <div class="mapper-grid" id="mapper-grid"></div>
+      <button class="btn" onclick="submitWithMapping()">Confirm & Analyse →</button>
+    </div>
   </div>
 
-  <div id="mapper-section">
-    <h3>Map your columns</h3>
-    <p>We couldn't auto-detect all required columns. Please match your spreadsheet columns to the fields below.</p>
-    <div class="mapper-grid" id="mapper-grid"></div>
-    <button class="btn" onclick="submitWithMapping()">Confirm & Analyse →</button>
-  </div>
-
+  <!-- ══════════════════════════════════════════════
+       STATS BAR (shown on both tabs)
+  ══════════════════════════════════════════════ -->
   <div id="stats-bar">
     <div class="stat-box"><span class="val" id="stat-orders">0</span><span class="lbl">Orders</span></div>
     <div class="stat-box"><span class="val" id="stat-products">0</span><span class="lbl">Products</span></div>
@@ -259,8 +275,64 @@
     </div>
   </div>
 
-  <div id="search-section">
-    <div class="section-label">Step 2 · Search for a product</div>
+  <!-- ══════════════════════════════════════════════
+       DASHBOARD PAGE
+  ══════════════════════════════════════════════ -->
+  <div class="page active" id="page-dashboard">
+
+    <div class="dash-header">
+      <h2>Dashboard <span id="dash-order-count"></span></h2>
+      <button class="btn sm secondary" onclick="clearData()">🗑 Clear Data</button>
+    </div>
+
+    <!-- Date filter for dashboard -->
+    <div id="date-filter-row-dash" style="display:none; margin-bottom:20px;">
+      <div class="dash-date-bar">
+        <span class="field-label">Filter by date:</span>
+        <div class="date-range-widget" id="dash-date-widget">
+          <div class="dr-label">From</div>
+          <div class="dr-part">
+            <input type="date" id="dash-date-from" oninput="onDashDateChange()" />
+          </div>
+          <div class="dr-sep">→</div>
+          <div class="dr-part">
+            <input type="date" id="dash-date-to" oninput="onDashDateChange()" />
+          </div>
+          <button class="dr-clear hidden" id="dash-dr-clear" onclick="clearDashDate()" title="Clear">×</button>
+        </div>
+        <button class="btn sm" onclick="loadDashboard()">Apply →</button>
+      </div>
+    </div>
+
+    <div class="dash-grid" id="dash-grid">
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <h3>Top 25 Co-purchased Products</h3>
+          <span class="panel-meta">% of orders bought with another item</span>
+        </div>
+        <div class="dash-panel-body" id="dash-products-list">
+          <div class="dash-loading">Upload data to see results</div>
+        </div>
+      </div>
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <h3>Top 25 Product Pairs</h3>
+          <span class="panel-meta">% of all orders containing both</span>
+        </div>
+        <div class="dash-panel-body" id="dash-pairs-list">
+          <div class="dash-loading">Upload data to see results</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SEARCH PAGE
+  ══════════════════════════════════════════════ -->
+  <div class="page" id="page-search">
+
+    <div class="section-label" style="margin-bottom:16px;">Search for a product to see what it's bought with</div>
+
     <div class="search-grid">
       <div class="field">
         <label>Product Name</label>
@@ -290,20 +362,16 @@
       </div>
     </div>
 
-    <!-- Date range filter — only shown when data has dates, blank by default -->
-    <div id="date-filter-row">
+    <!-- Date filter for search -->
+    <div id="date-filter-row-search">
       <div class="field" style="margin-bottom:12px;">
-        <label>Date Range <span style="color:var(--muted);font-weight:normal;text-transform:none;letter-spacing:0">(optional — leave blank to include all orders)</span></label>
-        <div class="date-range-widget" id="date-range-widget">
+        <label>Date Range <span style="color:var(--muted);font-weight:normal;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <div class="date-range-widget" id="search-date-widget">
           <div class="dr-label">From</div>
-          <div class="dr-part">
-            <input type="date" id="s-date-from" placeholder="dd/mm/yyyy" oninput="onDateChange()" />
-          </div>
+          <div class="dr-part"><input type="date" id="s-date-from" oninput="onSearchDateChange()" /></div>
           <div class="dr-sep">→</div>
-          <div class="dr-part">
-            <input type="date" id="s-date-to" placeholder="dd/mm/yyyy" oninput="onDateChange()" />
-          </div>
-          <button class="dr-clear hidden" id="dr-clear-btn" onclick="clearDateRange()" title="Clear date filter">×</button>
+          <div class="dr-part"><input type="date" id="s-date-to" oninput="onSearchDateChange()" /></div>
+          <button class="dr-clear hidden" id="search-dr-clear" onclick="clearSearchDate()" title="Clear">×</button>
         </div>
       </div>
     </div>
@@ -311,19 +379,19 @@
     <div class="search-actions">
       <button class="btn" onclick="runSearch()" id="search-btn"><span id="spinner"></span>Analyse →</button>
       <button class="btn secondary" onclick="clearSearch()">Clear</button>
-      <button class="btn secondary" onclick="clearData()">🗑 Clear Data</button>
     </div>
-  </div>
 
-  <div id="results-section">
-    <div class="results-header">
-      <h3>Products bought with <span id="results-query"></span></h3>
-      <div class="results-meta" id="results-meta"></div>
+    <div id="results-section" style="margin-top:28px;">
+      <div class="results-header">
+        <h3>Products bought with <span id="results-query"></span></h3>
+        <div class="results-meta" id="results-meta"></div>
+      </div>
+      <div id="results-list"></div>
     </div>
-    <div id="results-list"></div>
-  </div>
+
+  </div><!-- /page-search -->
+
 </main>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -331,26 +399,20 @@ const API = (window.location.origin.includes('localhost') || window.location.ori
   ? 'http://localhost:8000' : window.location.origin;
 
 let pendingFile = null;
-let allNames = [];
-let allTypes = [];
-let dataMinDate = null;
-let dataMaxDate = null;
+let allNames = [], allTypes = [];
+let dataMinDate = null, dataMaxDate = null;
+let dataLoaded = false;
 
-// ── Date range widget ─────────────────────────────────────────
-function onDateChange() {
-  const from = document.getElementById('s-date-from').value;
-  const to   = document.getElementById('s-date-to').value;
-  const hasDate = from || to;
-  document.getElementById('date-range-widget').classList.toggle('active', !!hasDate);
-  document.getElementById('dr-clear-btn').classList.toggle('hidden', !hasDate);
+// ── Tab switching ─────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'dashboard' && dataLoaded) loadDashboard();
 }
 
-function clearDateRange() {
-  document.getElementById('s-date-from').value = '';
-  document.getElementById('s-date-to').value   = '';
-  onDateChange();
-}
-
+// ── Date helpers ──────────────────────────────────────────────
 function formatDate(iso) {
   if (!iso) return null;
   const [y,m,d] = iso.split('-');
@@ -358,7 +420,109 @@ function formatDate(iso) {
   return `${d} ${months[parseInt(m)-1]} ${y}`;
 }
 
-// ── Searchable combo ─────────────────────────────────────────
+function onDashDateChange() {
+  const f = document.getElementById('dash-date-from').value;
+  const t = document.getElementById('dash-date-to').value;
+  const has = f || t;
+  document.getElementById('dash-date-widget').classList.toggle('active', !!has);
+  document.getElementById('dash-dr-clear').classList.toggle('hidden', !has);
+}
+function clearDashDate() {
+  document.getElementById('dash-date-from').value = '';
+  document.getElementById('dash-date-to').value = '';
+  onDashDateChange();
+  loadDashboard();
+}
+
+function onSearchDateChange() {
+  const f = document.getElementById('s-date-from').value;
+  const t = document.getElementById('s-date-to').value;
+  const has = f || t;
+  document.getElementById('search-date-widget').classList.toggle('active', !!has);
+  document.getElementById('search-dr-clear').classList.toggle('hidden', !has);
+}
+function clearSearchDate() {
+  document.getElementById('s-date-from').value = '';
+  document.getElementById('s-date-to').value = '';
+  onSearchDateChange();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────
+async function loadDashboard() {
+  const from = document.getElementById('dash-date-from').value;
+  const to   = document.getElementById('dash-date-to').value;
+
+  document.getElementById('dash-products-list').innerHTML = '<div class="dash-loading"><span id="dash-spinner"></span> Loading…</div>';
+  document.getElementById('dash-pairs-list').innerHTML    = '<div class="dash-loading"> </div>';
+
+  const params = new URLSearchParams({ limit: 25 });
+  if (from) params.set('date_from', from);
+  if (to)   params.set('date_to', to);
+
+  try {
+    const res = await fetch(`${API}/dashboard?${params}`);
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    const data = await res.json();
+
+    // Update order count in header
+    let countLabel = data.total_orders.toLocaleString() + ' orders';
+    if (from || to) {
+      const f = from ? formatDate(from) : 'start';
+      const t = to   ? formatDate(to)   : 'present';
+      countLabel += ` · ${f} – ${t}`;
+    }
+    document.getElementById('dash-order-count').textContent = `· ${countLabel}`;
+
+    renderTopProducts(data.top_products);
+    renderTopPairs(data.top_pairs);
+  } catch(err) {
+    document.getElementById('dash-products-list').innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
+    document.getElementById('dash-pairs-list').innerHTML    = `<div class="dash-empty"> </div>`;
+  }
+}
+
+function renderTopProducts(items) {
+  const el = document.getElementById('dash-products-list');
+  if (!items.length) { el.innerHTML = '<div class="dash-empty">No data</div>'; return; }
+  const max = items[0].copurchase_pct;
+  el.innerHTML = items.map((p, i) => `
+    <div class="dash-row">
+      <div class="dash-rank">${i+1}</div>
+      <div class="dash-info">
+        <div class="dash-name" title="${esc(p.name)}">${esc(p.name)}</div>
+        <div class="dash-sub">${[p.sku && '🏷 '+p.sku, p.type && '📂 '+p.type].filter(Boolean).join('  ')}</div>
+        <div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:${Math.round(p.copurchase_pct/max*100)}%"></div></div>
+      </div>
+      <div class="dash-right">
+        <div class="dash-pct">${p.copurchase_pct}%</div>
+        <div class="dash-count">${p.copurchase_orders.toLocaleString()} orders</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderTopPairs(items) {
+  const el = document.getElementById('dash-pairs-list');
+  if (!items.length) { el.innerHTML = '<div class="dash-empty">No pairs found — most orders contain a single item</div>'; return; }
+  const max = items[0].pct;
+  el.innerHTML = items.map((p, i) => `
+    <div class="pair-row">
+      <div class="pair-top">
+        <div class="pair-rank">${i+1}</div>
+        <div class="pair-names">
+          <div class="pair-a" title="${esc(p.product_a.name)}">${esc(p.product_a.name)}</div>
+          <div class="pair-plus">+</div>
+          <div class="pair-b" title="${esc(p.product_b.name)}">${esc(p.product_b.name)}</div>
+        </div>
+        <div class="pair-right">
+          <div class="pair-pct">${p.pct}%</div>
+          <div class="pair-count">${p.count.toLocaleString()} orders</div>
+        </div>
+      </div>
+      <div class="pair-bar-wrap"><div class="pair-bar-fill" style="width:${Math.round(p.pct/max*100)}%"></div></div>
+    </div>`).join('');
+}
+
+// ── Combo boxes ───────────────────────────────────────────────
 function initCombo(key, items) {
   const input    = document.getElementById(`combo-${key}-input`);
   const dropdown = document.getElementById(`combo-${key}-dropdown`);
@@ -366,96 +530,87 @@ function initCombo(key, items) {
   let hi = -1;
 
   function render(filter) {
-    const fl = (filter || '').toLowerCase();
-    const matches = fl ? items.filter(i => i.toLowerCase().includes(fl)).slice(0,150) : items.slice(0,150);
+    const fl = (filter||'').toLowerCase();
+    const matches = fl ? items.filter(i=>i.toLowerCase().includes(fl)).slice(0,150) : items.slice(0,150);
     dropdown.innerHTML = matches.length
-      ? matches.map((m,i) => `<div class="combo-option" data-val="${esc(m)}" data-idx="${i}">${esc(m)}</div>`).join('')
+      ? matches.map((m,i)=>`<div class="combo-option" data-val="${esc(m)}" data-idx="${i}">${esc(m)}</div>`).join('')
       : `<div class="combo-option no-results">No matches</div>`;
     hi = -1;
-    dropdown.querySelectorAll('.combo-option:not(.no-results)').forEach(el => {
-      el.addEventListener('mousedown', e => { e.preventDefault(); pick(key, el.dataset.val); });
+    dropdown.querySelectorAll('.combo-option:not(.no-results)').forEach(el=>{
+      el.addEventListener('mousedown', e=>{e.preventDefault(); pick(key,el.dataset.val);});
     });
   }
-
   function open()  { render(input.value); dropdown.classList.add('open'); }
-  function close() { dropdown.classList.remove('open'); hi = -1; }
-
+  function close() { dropdown.classList.remove('open'); hi=-1; }
   input.addEventListener('focus', open);
-  input.addEventListener('input', () => { open(); clearBtn.classList.toggle('visible', !!input.value); });
-  input.addEventListener('blur',  () => setTimeout(close, 160));
-  input.addEventListener('keydown', e => {
-    const opts = [...dropdown.querySelectorAll('.combo-option:not(.no-results)')];
-    if      (e.key==='ArrowDown') { e.preventDefault(); hi=Math.min(hi+1,opts.length-1); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); opts[hi]?.scrollIntoView({block:'nearest'}); }
-    else if (e.key==='ArrowUp')   { e.preventDefault(); hi=Math.max(hi-1,0); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); }
-    else if (e.key==='Enter')     { hi>=0&&opts[hi] ? pick(key,opts[hi].dataset.val) : (close(),runSearch()); }
-    else if (e.key==='Escape')    { close(); }
+  input.addEventListener('input', ()=>{open(); clearBtn.classList.toggle('visible',!!input.value);});
+  input.addEventListener('blur', ()=>setTimeout(close,160));
+  input.addEventListener('keydown', e=>{
+    const opts=[...dropdown.querySelectorAll('.combo-option:not(.no-results)')];
+    if      (e.key==='ArrowDown'){e.preventDefault();hi=Math.min(hi+1,opts.length-1);opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi));opts[hi]?.scrollIntoView({block:'nearest'});}
+    else if (e.key==='ArrowUp')  {e.preventDefault();hi=Math.max(hi-1,0);opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi));}
+    else if (e.key==='Enter')    {hi>=0&&opts[hi]?pick(key,opts[hi].dataset.val):(close(),runSearch());}
+    else if (e.key==='Escape')   {close();}
   });
 }
-
-function pick(key, val) {
-  document.getElementById(`combo-${key}-input`).value = val;
+function pick(key,val){
+  document.getElementById(`combo-${key}-input`).value=val;
   document.getElementById(`combo-${key}-dropdown`).classList.remove('open');
   document.getElementById(`combo-${key}-clear`).classList.add('visible');
 }
-function clearCombo(key) {
-  document.getElementById(`combo-${key}-input`).value = '';
+function clearCombo(key){
+  document.getElementById(`combo-${key}-input`).value='';
   document.getElementById(`combo-${key}-clear`).classList.remove('visible');
   document.getElementById(`combo-${key}-input`).focus();
 }
 
 // ── Upload ────────────────────────────────────────────────────
-document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) uploadFile(e.target.files[0]); });
-const dz = document.getElementById('drop-zone');
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
+document.getElementById('file-input').addEventListener('change', e=>{if(e.target.files[0])uploadFile(e.target.files[0]);});
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');if(e.dataTransfer.files[0])uploadFile(e.dataTransfer.files[0]);});
 
 async function uploadFile(file) {
-  pendingFile = file;
-  showProgress(true, 'Uploading file…', 20);
-  const form = new FormData();
-  form.append('file', file);
+  pendingFile=file;
+  showProgress(true,'Uploading file…',20);
+  const form=new FormData(); form.append('file',file);
   try {
-    const res = await fetch(`${API}/upload`, { method:'POST', body:form });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    if (data.status === 'needs_mapping') { showProgress(false); showMapper(data.headers, data.col_map); }
-    else { showProgress(true,'Processing complete!',100); setTimeout(()=>{ showProgress(false); applyStats(data); },600); }
-  } catch(err) { showProgress(false); showToast('Upload failed: '+err.message,'error'); }
+    const res=await fetch(`${API}/upload`,{method:'POST',body:form});
+    if(!res.ok) throw new Error(await res.text());
+    const data=await res.json();
+    if(data.status==='needs_mapping'){showProgress(false);showMapper(data.headers,data.col_map);}
+    else{showProgress(true,'Processing complete!',100);setTimeout(()=>{showProgress(false);applyStats(data);},600);}
+  } catch(err){showProgress(false);showToast('Upload failed: '+err.message,'error');}
 }
 
-function showMapper(headers, detected) {
-  const grid = document.getElementById('mapper-grid');
-  grid.innerHTML = '';
-  [['order_id','Order ID *'],['product_name','Product Name *'],['sku','SKU'],['product_id','Product ID'],['product_type','Product Type'],['created_at','Order Date']].forEach(([k,lbl]) => {
-    const di = detected[k]!==undefined ? detected[k] : '';
-    const div = document.createElement('div'); div.className='field';
+function showMapper(headers,detected){
+  const grid=document.getElementById('mapper-grid'); grid.innerHTML='';
+  [['order_id','Order ID *'],['product_name','Product Name *'],['sku','SKU'],['product_id','Product ID'],['product_type','Product Type'],['created_at','Order Date']].forEach(([k,lbl])=>{
+    const di=detected[k]!==undefined?detected[k]:'';
+    const div=document.createElement('div'); div.className='field';
     div.innerHTML=`<label>${lbl}</label><select id="map-${k}"><option value="">— not mapped —</option>${headers.map((h,i)=>`<option value="${i}"${di===i?' selected':''}>${h}</option>`).join('')}</select>`;
     grid.appendChild(div);
   });
   document.getElementById('mapper-section').classList.add('visible');
 }
 
-async function submitWithMapping() {
-  const g = id => { const el=document.getElementById(id); return el?el.value:''; };
-  const oic=g('map-order_id'), nc=g('map-product_name');
-  if (!oic&&oic!=='0'){showToast('Order ID column is required','error');return;}
-  if (!nc&&nc!=='0'){showToast('Product Name column is required','error');return;}
+async function submitWithMapping(){
+  const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
+  const oic=g('map-order_id'),nc=g('map-product_name');
+  if(!oic&&oic!=='0'){showToast('Order ID column is required','error');return;}
+  if(!nc&&nc!=='0'){showToast('Product Name column is required','error');return;}
   showProgress(true,'Processing…',30);
-  const params=new URLSearchParams({
-    order_id_col:oic, product_name_col:nc,
-    sku_col:g('map-sku')||-1, product_id_col:g('map-product_id')||-1,
-    product_type_col:g('map-product_type')||-1, date_col:g('map-created_at')||-1
-  });
+  const params=new URLSearchParams({order_id_col:oic,product_name_col:nc,sku_col:g('map-sku')||-1,product_id_col:g('map-product_id')||-1,product_type_col:g('map-product_type')||-1,date_col:g('map-created_at')||-1});
   const form=new FormData(); form.append('file',pendingFile);
-  try {
+  try{
     const res=await fetch(`${API}/upload-with-mapping?${params}`,{method:'POST',body:form});
-    if (!res.ok) throw new Error(await res.text());
+    if(!res.ok) throw new Error(await res.text());
     const data=await res.json();
     showProgress(true,'Done!',100);
     document.getElementById('mapper-section').classList.remove('visible');
-    setTimeout(()=>{ showProgress(false); applyStats(data); },600);
-  } catch(err){ showProgress(false); showToast('Failed: '+err.message,'error'); }
+    setTimeout(()=>{showProgress(false);applyStats(data);},600);
+  } catch(err){showProgress(false);showToast('Failed: '+err.message,'error');}
 }
 
 function applyStats(data) {
@@ -469,151 +624,117 @@ function applyStats(data) {
 
   if (data.has_dates && data.min_date && data.max_date) {
     document.getElementById('stat-date-box').style.display = 'block';
-    document.getElementById('stat-date-range').textContent =
-      `${formatDate(data.min_date)} –\n${formatDate(data.max_date)}`;
+    document.getElementById('stat-date-range').textContent = `${formatDate(data.min_date)} –\n${formatDate(data.max_date)}`;
 
-    // Set min/max constraints on the pickers but leave them BLANK by default
-    document.getElementById('s-date-from').min = data.min_date;
-    document.getElementById('s-date-from').max = data.max_date;
-    document.getElementById('s-date-to').min   = data.min_date;
-    document.getElementById('s-date-to').max   = data.max_date;
-    document.getElementById('s-date-from').value = '';
-    document.getElementById('s-date-to').value   = '';
-
-    document.getElementById('date-filter-row').classList.add('visible');
+    // Set constraints, leave blank by default
+    ['dash-date-from','dash-date-to','s-date-from','s-date-to'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.min=data.min_date; el.max=data.max_date; el.value='';
+    });
+    document.getElementById('date-filter-row-dash').style.display='block';
+    document.getElementById('date-filter-row-search').style.display='block';
   } else {
-    document.getElementById('stat-date-box').style.display = 'none';
-    document.getElementById('date-filter-row').classList.remove('visible');
+    document.getElementById('stat-date-box').style.display='none';
+    document.getElementById('date-filter-row-dash').style.display='none';
+    document.getElementById('date-filter-row-search').style.display='none';
   }
 
-  allNames = data.names || [];
-  allTypes = data.types || [];
-  initCombo('name', allNames);
-  initCombo('type', allTypes);
+  allNames=data.names||[]; allTypes=data.types||[];
+  initCombo('name',allNames); initCombo('type',allTypes);
 
   document.getElementById('stats-bar').classList.add('visible');
-  document.getElementById('search-section').classList.add('visible');
-  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('upload-page').style.display='none';
+  document.getElementById('tab-bar').classList.add('visible');
   document.getElementById('status-pill').classList.add('loaded');
-  document.getElementById('status-text').textContent = `${(data.order_count||0).toLocaleString()} orders loaded`;
+  document.getElementById('status-text').textContent=`${(data.order_count||0).toLocaleString()} orders loaded`;
+  dataLoaded=true;
+
   showToast(`✓ Loaded ${(data.order_count||0).toLocaleString()} orders`,'success');
+  loadDashboard();
 }
 
 // ── Search ────────────────────────────────────────────────────
-async function runSearch() {
-  const name     = document.getElementById('combo-name-input').value.trim();
-  const sku      = document.getElementById('s-sku').value.trim();
-  const pid      = document.getElementById('s-id').value.trim();
-  const type     = document.getElementById('combo-type-input').value.trim();
-  const dateFrom = document.getElementById('s-date-from').value;  // blank = no filter
-  const dateTo   = document.getElementById('s-date-to').value;
-
-  if (!name&&!sku&&!pid&&!type) { showToast('Enter at least one search term','error'); return; }
+async function runSearch(){
+  const name=document.getElementById('combo-name-input').value.trim();
+  const sku=document.getElementById('s-sku').value.trim();
+  const pid=document.getElementById('s-id').value.trim();
+  const type=document.getElementById('combo-type-input').value.trim();
+  const dateFrom=document.getElementById('s-date-from').value;
+  const dateTo=document.getElementById('s-date-to').value;
+  if(!name&&!sku&&!pid&&!type){showToast('Enter at least one search term','error');return;}
   setSearchLoading(true);
-
-  const params = new URLSearchParams();
-  if (name)     params.set('name', name);
-  if (sku)      params.set('sku', sku);
-  if (pid)      params.set('pid', pid);
-  if (type)     params.set('type', type);
-  if (dateFrom) params.set('date_from', dateFrom);  // only sent if user filled it in
-  if (dateTo)   params.set('date_to',   dateTo);
-
-  try {
-    const res = await fetch(`${API}/search?${params}`);
-    if (!res.ok) { const err=await res.json(); throw new Error(err.detail||res.statusText); }
-    const data = await res.json();
-
-    let dateLabel = '';
-    if (dateFrom || dateTo) {
-      const f = dateFrom ? formatDate(dateFrom) : 'start';
-      const t = dateTo   ? formatDate(dateTo)   : 'present';
-      dateLabel = ` · ${f} – ${t}`;
-    }
-    showResults(data.results, name||sku||pid||type, data.match_count, dateLabel);
-  } catch(err) { showToast('Search failed: '+err.message,'error'); }
-  finally { setSearchLoading(false); }
+  const params=new URLSearchParams();
+  if(name)params.set('name',name); if(sku)params.set('sku',sku);
+  if(pid)params.set('pid',pid);    if(type)params.set('type',type);
+  if(dateFrom)params.set('date_from',dateFrom);
+  if(dateTo)params.set('date_to',dateTo);
+  try{
+    const res=await fetch(`${API}/search?${params}`);
+    if(!res.ok){const e=await res.json();throw new Error(e.detail||res.statusText);}
+    const data=await res.json();
+    let dateLabel='';
+    if(dateFrom||dateTo){const f=dateFrom?formatDate(dateFrom):'start';const t=dateTo?formatDate(dateTo):'present';dateLabel=` · ${f} – ${t}`;}
+    showResults(data.results,name||sku||pid||type,data.match_count,dateLabel);
+  } catch(err){showToast('Search failed: '+err.message,'error');}
+  finally{setSearchLoading(false);}
 }
 
-function setSearchLoading(on) {
-  document.getElementById('spinner').classList.toggle('visible',on);
-  document.getElementById('search-btn').disabled=on;
-}
+function setSearchLoading(on){document.getElementById('spinner').classList.toggle('visible',on);document.getElementById('search-btn').disabled=on;}
+['s-sku','s-id'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();}));
 
-['s-sku','s-id'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') runSearch(); });
-});
-
-function showResults(results, query, matchCount, dateLabel='') {
+function showResults(results,query,matchCount,dateLabel=''){
   document.getElementById('results-section').classList.add('visible');
-  document.getElementById('results-query').textContent = `"${query}"`;
-  document.getElementById('results-meta').textContent =
-    `Found in ${matchCount.toLocaleString()} order${matchCount!==1?'s':''}${dateLabel}`;
-  const list = document.getElementById('results-list');
-  if (!results.length) {
-    list.innerHTML=`<div class="empty-state"><span>🔍</span><p>${matchCount>0?'This product was always bought alone.':'No orders matched your search.'}</p></div>`;
-    return;
-  }
-  const maxPct = results[0].pct;
-  list.innerHTML = results.map((r,i) => `
+  document.getElementById('results-query').textContent=`"${query}"`;
+  document.getElementById('results-meta').textContent=`Found in ${matchCount.toLocaleString()} order${matchCount!==1?'s':''}${dateLabel}`;
+  const list=document.getElementById('results-list');
+  if(!results.length){list.innerHTML=`<div class="dash-empty">${matchCount>0?'This product was always bought alone.':'No orders matched your search.'}</div>`;return;}
+  const maxPct=results[0].pct;
+  list.innerHTML=results.map((r,i)=>`
     <div class="product-card">
       <div>
         <div class="pc-rank">#${i+1}</div>
         <div class="pc-name">${esc(r.name)}</div>
-        <div class="pc-meta">
-          ${r.sku ?`<span>🏷 ${esc(r.sku)}</span>`:''}
-          ${r.type?`<span>📂 ${esc(r.type)}</span>`:''}
-          ${r.id  ?`<span>🆔 ${esc(r.id)}</span>`:''}
-        </div>
+        <div class="pc-meta">${r.sku?`<span>🏷 ${esc(r.sku)}</span>`:''} ${r.type?`<span>📂 ${esc(r.type)}</span>`:''} ${r.id?`<span>🆔 ${esc(r.id)}</span>`:''}</div>
       </div>
-      <div class="pc-right">
-        <div class="pc-pct">${r.pct}%</div>
-        <div class="pc-count">${r.count.toLocaleString()} order${r.count!==1?'s':''}</div>
-      </div>
+      <div class="pc-right"><div class="pc-pct">${r.pct}%</div><div class="pc-count">${r.count.toLocaleString()} order${r.count!==1?'s':''}</div></div>
       <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(r.pct/maxPct*100)}%"></div></div>
     </div>`).join('');
 }
 
-function clearSearch() {
-  clearCombo('name'); clearCombo('type');
-  ['s-sku','s-id'].forEach(id => document.getElementById(id).value='');
-  clearDateRange();
+function clearSearch(){
+  clearCombo('name');clearCombo('type');
+  ['s-sku','s-id'].forEach(id=>document.getElementById(id).value='');
+  clearSearchDate();
   document.getElementById('results-section').classList.remove('visible');
 }
 
-function clearData() {
-  allNames=[]; allTypes=[]; dataMinDate=null; dataMaxDate=null;
-  document.getElementById('upload-section').style.display='block';
+function clearData(){
+  allNames=[];allTypes=[];dataMinDate=null;dataMaxDate=null;dataLoaded=false;
+  document.getElementById('upload-page').style.display='block';
   document.getElementById('stats-bar').classList.remove('visible');
-  document.getElementById('search-section').classList.remove('visible');
-  document.getElementById('results-section').classList.remove('visible');
-  document.getElementById('date-filter-row').classList.remove('visible');
-  document.getElementById('stat-date-box').style.display='none';
+  document.getElementById('tab-bar').classList.remove('visible');
   document.getElementById('file-input').value='';
   document.getElementById('status-pill').classList.remove('loaded');
   document.getElementById('status-text').textContent='No data loaded';
+  document.getElementById('stat-date-box').style.display='none';
+  switchTab('dashboard');
   clearSearch();
 }
 
-function showProgress(show,label='',pct=0) {
+function showProgress(show,label='',pct=0){
   document.getElementById('progress-bar-wrap').classList.toggle('visible',show);
   document.getElementById('progress-fill').style.width=pct+'%';
   document.getElementById('progress-label').textContent=label;
   document.getElementById('choose-btn').disabled=show;
 }
 
-function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 let toastTimer;
-function showToast(msg,type='') {
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.className='toast show '+type;
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
-}
+function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3500);}
 
-// Check if server already has data loaded
+// ── On load: restore data if server has it ────────────────────
 (async()=>{
-  try { const res=await fetch(`${API}/stats`); if(res.ok){ const data=await res.json(); applyStats(data); } } catch(e){}
+  try{const res=await fetch(`${API}/stats`);if(res.ok){const data=await res.json();applyStats(data);}}catch(e){}
 })();
 </script>
 </body>
