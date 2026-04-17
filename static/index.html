@@ -321,18 +321,9 @@
     </div>
 
     <div class="dash-grid" id="dash-grid">
-      <div class="dash-panel">
+      <div class="dash-panel dash-grid-full">
         <div class="dash-panel-header">
-          <h3>Top 25 Co-purchased Products</h3>
-          <span class="panel-meta">% of orders bought with another item</span>
-        </div>
-        <div class="dash-panel-body" id="dash-products-list">
-          <div class="dash-loading">Upload data to see results</div>
-        </div>
-      </div>
-      <div class="dash-panel">
-        <div class="dash-panel-header">
-          <h3>Top 25 Product Pairs</h3>
+          <h3>Top 50 Product Pairs</h3>
           <span class="panel-meta">% of all orders containing both</span>
         </div>
         <div class="dash-panel-body" id="dash-pairs-list">
@@ -481,10 +472,7 @@ async function loadDashboard() {
   const from = document.getElementById('dash-date-from').value;
   const to   = document.getElementById('dash-date-to').value;
 
-  document.getElementById('dash-products-list').innerHTML = '<div class="dash-loading"><span id="dash-spinner"></span> Loading…</div>';
-  document.getElementById('dash-pairs-list').innerHTML    = '<div class="dash-loading"> </div>';
-  // Reset trios to placeholder when date changes
-  document.getElementById('dash-trios-list').innerHTML = document.getElementById('dash-trios-list').innerHTML.includes('trio-row') ? document.getElementById('dash-trios-list').innerHTML : document.getElementById('dash-trios-list').innerHTML;
+  document.getElementById('dash-pairs-list').innerHTML = '<div class="dash-loading"><span id="dash-spinner"></span> Loading…</div>';
 
   const params = new URLSearchParams({ limit: 25 });
   if (from) params.set('date_from', from);
@@ -504,7 +492,6 @@ async function loadDashboard() {
     }
     document.getElementById('dash-order-count').textContent = `· ${countLabel}`;
 
-    renderTopProducts(data.top_products);
     renderTopPairs(data.top_pairs);
     // Reset trios panel to placeholder when date filter changes
     document.getElementById('dash-trios-list').innerHTML = '<div class="dash-empty" id="trios-placeholder"><div style="margin-bottom:12px;color:var(--muted);font-size:12px;">Trio analysis is heavy on large datasets.<br>Click below when ready.</div><button class="btn sm" style="margin-top:0;" onclick="loadTrios()">Calculate Top 50 Trios →</button></div>';
@@ -512,25 +499,6 @@ async function loadDashboard() {
     document.getElementById('dash-products-list').innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
     document.getElementById('dash-pairs-list').innerHTML    = `<div class="dash-empty"> </div>`;
   }
-}
-
-function renderTopProducts(items) {
-  const el = document.getElementById('dash-products-list');
-  if (!items.length) { el.innerHTML = '<div class="dash-empty">No data</div>'; return; }
-  const max = items[0].copurchase_pct;
-  el.innerHTML = items.map((p, i) => `
-    <div class="dash-row">
-      <div class="dash-rank">${i+1}</div>
-      <div class="dash-info">
-        <div class="dash-name" title="${esc(p.name)}">${esc(p.name)}</div>
-        <div class="dash-sub">${[p.sku && '🏷 '+p.sku, p.type && '📂 '+p.type].filter(Boolean).join('  ')}</div>
-        <div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:${Math.round(p.copurchase_pct/max*100)}%"></div></div>
-      </div>
-      <div class="dash-right">
-        <div class="dash-pct">${p.copurchase_pct}%</div>
-        <div class="dash-count">${p.copurchase_orders.toLocaleString()} orders</div>
-      </div>
-    </div>`).join('');
 }
 
 function renderTopPairs(items) {
