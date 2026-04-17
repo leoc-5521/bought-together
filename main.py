@@ -5,6 +5,7 @@ import pickle
 from collections import defaultdict
 from typing import Optional
 from datetime import datetime, date
+from itertools import combinations
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,7 +42,6 @@ def load_from_disk():
         print(f"Warning: could not load data from disk: {e}")
     return {}, {}
 
-# ── In-memory store ──────────────────────────────────────────────
 orders_map, stats = load_from_disk()
 
 FIELD_SYNONYMS = {
@@ -54,15 +54,10 @@ FIELD_SYNONYMS = {
 }
 
 DATE_FORMATS = [
-    "%Y-%m-%d %H:%M:%S %z",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y-%m-%dT%H:%M:%S%z",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%d",
-    "%d/%m/%Y %H:%M",
-    "%d/%m/%Y",
-    "%m/%d/%Y %H:%M",
-    "%m/%d/%Y",
+    "%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S%z",  "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y",
+    "%m/%d/%Y %H:%M", "%m/%d/%Y",
 ]
 
 def parse_date(val: str) -> Optional[date]:
@@ -79,7 +74,7 @@ def parse_date(val: str) -> Optional[date]:
     except ValueError:
         return None
 
-def detect_columns(headers: list[str]) -> dict[str, int]:
+def detect_columns(headers):
     col_map = {}
     normalised = [h.lower().strip().replace('"','') for h in headers]
     for field, synonyms in FIELD_SYNONYMS.items():
@@ -89,13 +84,25 @@ def detect_columns(headers: list[str]) -> dict[str, int]:
                     col_map[field] = i
     return col_map
 
-def parse_csv_bytes(content: bytes) -> tuple[list[str], list[list[str]]]:
+def parse_csv_bytes(content: bytes):
     text = content.decode("utf-8-sig", errors="replace")
     reader = csv.reader(io.StringIO(text))
     rows = list(reader)
     if not rows:
         raise ValueError("File is empty")
     return rows[0], rows[1:]
+
+def in_date_range(order, df, dt):
+    if not df and not dt:
+        return True
+    od = order.get("date")
+    if od is None:
+        return True
+    if df and od < df:
+        return False
+    if dt and od > dt:
+        return False
+    return True
 
 # ── Upload endpoints ─────────────────────────────────────────────
 @app.post("/upload")
@@ -104,15 +111,8 @@ async def upload(file: UploadFile = File(...)):
     content = await file.read()
     headers, rows = parse_csv_bytes(content)
     col_map = detect_columns(headers)
-
     if "order_id" not in col_map or "product_name" not in col_map:
-        return {
-            "status": "needs_mapping",
-            "headers": headers,
-            "col_map": col_map,
-            "row_count": len(rows),
-        }
-
+        return {"status": "needs_mapping", "headers": headers, "col_map": col_map, "row_count": len(rows)}
     orders_map, stats = build_orders_map(rows, col_map)
     save_to_disk(orders_map, stats)
     return {"status": "ok", **stats}
@@ -135,21 +135,17 @@ async def upload_with_mapping(
     global orders_map, stats
     content = await file.read()
     _, rows = parse_csv_bytes(content)
-    col_map = {
-        "order_id": order_id_col,
-        "product_name": product_name_col,
-    }
+    col_map = {"order_id": order_id_col, "product_name": product_name_col}
     if sku_col >= 0:          col_map["sku"] = sku_col
     if product_id_col >= 0:   col_map["product_id"] = product_id_col
     if product_type_col >= 0: col_map["product_type"] = product_type_col
     if date_col >= 0:         col_map["created_at"] = date_col
-
     orders_map, stats = build_orders_map(rows, col_map)
     save_to_disk(orders_map, stats)
     return {"status": "ok", **stats}
 
 def build_orders_map(rows, col_map):
-    om: dict[str, dict] = defaultdict(lambda: {"products": [], "date": None})
+    om = defaultdict(lambda: {"products": [], "date": None})
 
     def get(row, field):
         idx = col_map.get(field)
@@ -162,46 +158,30 @@ def build_orders_map(rows, col_map):
         name     = get(row, "product_name")
         if not order_id or not name:
             continue
-
-        sku      = get(row, "sku")
-        pid      = get(row, "product_id")
-        ptype    = get(row, "product_type")
-        raw_date = get(row, "created_at")
-
+        sku = get(row, "sku"); pid = get(row, "product_id")
+        ptype = get(row, "product_type"); raw_date = get(row, "created_at")
         if om[order_id]["date"] is None and raw_date:
             om[order_id]["date"] = parse_date(raw_date)
-
         key = f"{name}|{sku}"
         if not any(p["_key"] == key for p in om[order_id]["products"]):
-            om[order_id]["products"].append({
-                "name": name, "sku": sku, "id": pid, "type": ptype, "_key": key
-            })
+            om[order_id]["products"].append({"name": name, "sku": sku, "id": pid, "type": ptype, "_key": key})
 
     om = dict(om)
-
-    all_names = set()
-    all_skus  = set()
-    all_types = set()
-    all_dates = []
-
+    all_names = set(); all_skus = set(); all_types = set(); all_dates = []
     for order in om.values():
         for p in order["products"]:
-            if p["name"]:  all_names.add(p["name"])
-            if p["sku"]:   all_skus.add(p["sku"])
-            if p["type"]:  all_types.add(p["type"])
-        if order["date"]:
-            all_dates.append(order["date"])
+            if p["name"]: all_names.add(p["name"])
+            if p["sku"]:  all_skus.add(p["sku"])
+            if p["type"]: all_types.add(p["type"])
+        if order["date"]: all_dates.append(order["date"])
 
     s = {
-        "order_count":   len(om),
-        "product_count": len(all_names),
-        "sku_count":     len(all_skus),
-        "type_count":    len(all_types),
-        "types":         sorted(all_types),
-        "names":         sorted(all_names),
-        "min_date":      str(min(all_dates)) if all_dates else None,
-        "max_date":      str(max(all_dates)) if all_dates else None,
-        "has_dates":     bool(all_dates),
+        "order_count": len(om), "product_count": len(all_names),
+        "sku_count": len(all_skus), "type_count": len(all_types),
+        "types": sorted(all_types), "names": sorted(all_names),
+        "min_date": str(min(all_dates)) if all_dates else None,
+        "max_date": str(max(all_dates)) if all_dates else None,
+        "has_dates": bool(all_dates),
     }
     return om, s
 
@@ -211,6 +191,99 @@ def get_stats():
     if not orders_map:
         raise HTTPException(status_code=404, detail="No data loaded")
     return stats
+
+# ── Dashboard endpoint ───────────────────────────────────────────
+@app.get("/dashboard")
+def dashboard(
+    date_from: Optional[str] = Query(None),
+    date_to:   Optional[str] = Query(None),
+    limit:     int           = Query(25),
+):
+    if not orders_map:
+        raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
+
+    df = parse_date(date_from) if date_from else None
+    dt = parse_date(date_to)   if date_to   else None
+
+    # Filter orders by date
+    filtered_orders = [
+        order for order in orders_map.values()
+        if in_date_range(order, df, dt)
+    ]
+    total_orders = len(filtered_orders)
+
+    if total_orders == 0:
+        return {"total_orders": 0, "top_products": [], "top_pairs": []}
+
+    # ── Top products: how often each product appears alongside any other product
+    # "co-purchase rate" = orders where product appeared WITH at least one other item / total orders with that product
+    product_total_orders: dict[str, int] = defaultdict(int)   # orders containing this product
+    product_copurchase_orders: dict[str, int] = defaultdict(int)  # orders with this product + at least one other
+    product_data: dict[str, dict] = {}
+
+    for order in filtered_orders:
+        products = order["products"]
+        multi = len(products) > 1
+        for p in products:
+            k = p["_key"]
+            product_total_orders[k] += 1
+            if multi:
+                product_copurchase_orders[k] += 1
+            if k not in product_data:
+                product_data[k] = {f: p[f] for f in ("name","sku","id","type")}
+
+    top_products = sorted(
+        [
+            {
+                **product_data[k],
+                "total_orders": product_total_orders[k],
+                "copurchase_orders": product_copurchase_orders[k],
+                "copurchase_pct": round(product_copurchase_orders[k] / product_total_orders[k] * 100, 1)
+                    if product_total_orders[k] else 0,
+            }
+            for k in product_data
+        ],
+        key=lambda x: (-x["copurchase_pct"], -x["copurchase_orders"])
+    )[:limit]
+
+    # ── Top pairs: most common two-product combinations
+    pair_count: dict[tuple, int] = defaultdict(int)
+    pair_data: dict[tuple, dict] = {}
+
+    for order in filtered_orders:
+        products = order["products"]
+        if len(products) < 2:
+            continue
+        # Sort keys so (A,B) and (B,A) are treated the same
+        keys = sorted(set(p["_key"] for p in products))
+        for ka, kb in combinations(keys, 2):
+            pair = (ka, kb)
+            pair_count[pair] += 1
+            if pair not in pair_data:
+                pa = next(p for p in products if p["_key"] == ka)
+                pb = next(p for p in products if p["_key"] == kb)
+                pair_data[pair] = {
+                    "product_a": {f: pa[f] for f in ("name","sku","id","type")},
+                    "product_b": {f: pb[f] for f in ("name","sku","id","type")},
+                }
+
+    top_pairs = sorted(
+        [
+            {
+                **pair_data[pair],
+                "count": cnt,
+                "pct": round(cnt / total_orders * 100, 1),
+            }
+            for pair, cnt in pair_count.items()
+        ],
+        key=lambda x: (-x["pct"], -x["count"])
+    )[:limit]
+
+    return {
+        "total_orders": total_orders,
+        "top_products": top_products,
+        "top_pairs": top_pairs,
+    }
 
 # ── Search endpoint ──────────────────────────────────────────────
 @app.get("/search")
@@ -226,10 +299,8 @@ def search(
     if not orders_map:
         raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
 
-    nl = (name or "").lower()
-    sl = (sku  or "").lower()
-    il = (pid  or "").lower()
-    tl = (type or "").lower()
+    nl = (name or "").lower(); sl = (sku or "").lower()
+    il = (pid  or "").lower(); tl = (type or "").lower()
 
     if not any([nl, sl, il, tl]):
         raise HTTPException(status_code=400, detail="Provide at least one search term")
@@ -238,31 +309,13 @@ def search(
     dt = parse_date(date_to)   if date_to   else None
 
     def is_match(p):
-        return (
-            (nl and nl in p["name"].lower()) or
-            (sl and sl in p["sku"].lower())  or
-            (il and il in p["id"].lower())   or
-            (tl and tl in p["type"].lower())
-        )
+        return ((nl and nl in p["name"].lower()) or (sl and sl in p["sku"].lower()) or
+                (il and il in p["id"].lower())   or (tl and tl in p["type"].lower()))
 
-    def in_date_range(order):
-        if not df and not dt:
-            return True
-        od = order.get("date")
-        if od is None:
-            return True
-        if df and od < df:
-            return False
-        if dt and od > dt:
-            return False
-        return True
-
-    matching_orders = []
-    for order_id, order in orders_map.items():
-        if not in_date_range(order):
-            continue
-        if any(is_match(p) for p in order["products"]):
-            matching_orders.append(order["products"])
+    matching_orders = [
+        order["products"] for order in orders_map.values()
+        if in_date_range(order, df, dt) and any(is_match(p) for p in order["products"])
+    ]
 
     if not matching_orders:
         return {"match_count": 0, "results": []}
@@ -271,8 +324,7 @@ def search(
     co_data:  dict[str, dict] = {}
 
     for products in matching_orders:
-        others = [p for p in products if not is_match(p)]
-        for p in others:
+        for p in [p for p in products if not is_match(p)]:
             key = p["_key"]
             co_count[key] += 1
             if key not in co_data:
@@ -280,10 +332,7 @@ def search(
 
     total = len(matching_orders)
     results = sorted(
-        [
-            {**co_data[k], "count": c, "pct": round(c / total * 100, 1)}
-            for k, c in co_count.items()
-        ],
+        [{**co_data[k], "count": c, "pct": round(c / total * 100, 1)} for k, c in co_count.items()],
         key=lambda x: (-x["pct"], -x["count"])
     )[:limit]
 
