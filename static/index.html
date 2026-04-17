@@ -346,7 +346,10 @@
           <span class="panel-meta">% of all orders containing all three products</span>
         </div>
         <div class="dash-panel-body" id="dash-trios-list" style="max-height:500px;">
-          <div class="dash-loading">Upload data to see results</div>
+          <div class="dash-empty" id="trios-placeholder">
+            <div style="margin-bottom:12px;color:var(--muted);font-size:12px;">Trio analysis is heavy on large datasets.<br>Click below when ready.</div>
+            <button class="btn sm" style="margin-top:0;" onclick="loadTrios()">Calculate Top 50 Trios →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -480,7 +483,8 @@ async function loadDashboard() {
 
   document.getElementById('dash-products-list').innerHTML = '<div class="dash-loading"><span id="dash-spinner"></span> Loading…</div>';
   document.getElementById('dash-pairs-list').innerHTML    = '<div class="dash-loading"> </div>';
-  document.getElementById('dash-trios-list').innerHTML   = '<div class="dash-loading"> </div>';
+  // Reset trios to placeholder when date changes
+  document.getElementById('dash-trios-list').innerHTML = document.getElementById('dash-trios-list').innerHTML.includes('trio-row') ? document.getElementById('dash-trios-list').innerHTML : document.getElementById('dash-trios-list').innerHTML;
 
   const params = new URLSearchParams({ limit: 25 });
   if (from) params.set('date_from', from);
@@ -502,7 +506,8 @@ async function loadDashboard() {
 
     renderTopProducts(data.top_products);
     renderTopPairs(data.top_pairs);
-    renderTopTrios(data.top_trios || []);
+    // Reset trios panel to placeholder when date filter changes
+    document.getElementById('dash-trios-list').innerHTML = '<div class="dash-empty" id="trios-placeholder"><div style="margin-bottom:12px;color:var(--muted);font-size:12px;">Trio analysis is heavy on large datasets.<br>Click below when ready.</div><button class="btn sm" style="margin-top:0;" onclick="loadTrios()">Calculate Top 50 Trios →</button></div>';
   } catch(err) {
     document.getElementById('dash-products-list').innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
     document.getElementById('dash-pairs-list').innerHTML    = `<div class="dash-empty"> </div>`;
@@ -550,28 +555,42 @@ function renderTopPairs(items) {
     </div>`).join('');
 }
 
-function renderTopTrios(items) {
+async function loadTrios() {
   const el = document.getElementById('dash-trios-list');
-  if (!items.length) { el.innerHTML = '<div class="dash-empty">No three-product combinations found — not enough orders with 3+ items</div>'; return; }
-  const max = items[0].pct;
-  el.innerHTML = items.map((t, i) => `
-    <div class="trio-row">
-      <div class="trio-top">
-        <div class="trio-rank">${i+1}</div>
-        <div class="trio-names">
-          <div class="trio-product" title="${esc(t.product_a.name)}">${esc(t.product_a.name)}</div>
-          <div class="trio-sep">+</div>
-          <div class="trio-product" title="${esc(t.product_b.name)}">${esc(t.product_b.name)}</div>
-          <div class="trio-sep">+</div>
-          <div class="trio-product" title="${esc(t.product_c.name)}">${esc(t.product_c.name)}</div>
+  el.innerHTML = '<div class="dash-loading">Calculating trios… this may take a moment on large datasets</div>';
+  const from = document.getElementById('dash-date-from').value;
+  const to   = document.getElementById('dash-date-to').value;
+  const params = new URLSearchParams();
+  if (from) params.set('date_from', from);
+  if (to)   params.set('date_to', to);
+  try {
+    const res = await fetch(`${API}/trios?${params}`);
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    const data = await res.json();
+    const items = data.top_trios || [];
+    if (!items.length) { el.innerHTML = '<div class="dash-empty">No three-product combinations found — not enough orders with 3+ items</div>'; return; }
+    const max = items[0].pct;
+    el.innerHTML = items.map((t, i) => `
+      <div class="trio-row">
+        <div class="trio-top">
+          <div class="trio-rank">${i+1}</div>
+          <div class="trio-names">
+            <div class="trio-product" title="${esc(t.product_a.name)}">${esc(t.product_a.name)}</div>
+            <div class="trio-sep">+</div>
+            <div class="trio-product" title="${esc(t.product_b.name)}">${esc(t.product_b.name)}</div>
+            <div class="trio-sep">+</div>
+            <div class="trio-product" title="${esc(t.product_c.name)}">${esc(t.product_c.name)}</div>
+          </div>
+          <div class="trio-right">
+            <div class="trio-pct">${t.pct}%</div>
+            <div class="trio-count">${t.count.toLocaleString()} orders</div>
+          </div>
         </div>
-        <div class="trio-right">
-          <div class="trio-pct">${t.pct}%</div>
-          <div class="trio-count">${t.count.toLocaleString()} orders</div>
-        </div>
-      </div>
-      <div class="trio-bar-wrap"><div class="trio-bar-fill" style="width:${Math.round(t.pct/max*100)}%"></div></div>
-    </div>`).join('');
+        <div class="trio-bar-wrap"><div class="trio-bar-fill" style="width:${Math.round(t.pct/max*100)}%"></div></div>
+      </div>`).join('');
+  } catch(err) {
+    el.innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
+  }
 }
 
 // ── Combo boxes ───────────────────────────────────────────────
