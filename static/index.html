@@ -159,6 +159,7 @@
   .dash-date-bar .field-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; }
 
   .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .dash-grid-full { grid-column: 1 / -1; }
   @media(max-width:750px){ .dash-grid { grid-template-columns: 1fr; } }
 
   .dash-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -198,6 +199,21 @@
   .pair-count { font-size: 10px; color: var(--muted); }
   .pair-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
   .pair-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+
+  /* Trio rows */
+  .trio-row { padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .trio-row:last-child { border-bottom: none; }
+  .trio-row:hover { background: var(--surface2); }
+  .trio-top { display: flex; align-items: center; gap: 10px; }
+  .trio-rank { font-size: 11px; color: var(--muted); width: 24px; flex-shrink: 0; text-align: right; }
+  .trio-names { flex: 1; min-width: 0; }
+  .trio-product { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trio-sep { font-size: 10px; color: var(--muted); margin: 1px 0; }
+  .trio-right { text-align: right; flex-shrink: 0; }
+  .trio-pct { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: var(--accent); line-height: 1; }
+  .trio-count { font-size: 10px; color: var(--muted); }
+  .trio-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .trio-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
 
   .dash-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 12px; }
   .dash-loading { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 12px; }
@@ -320,6 +336,16 @@
           <span class="panel-meta">% of all orders containing both</span>
         </div>
         <div class="dash-panel-body" id="dash-pairs-list">
+          <div class="dash-loading">Upload data to see results</div>
+        </div>
+      </div>
+      <!-- Trios panel — full width -->
+      <div class="dash-panel dash-grid-full">
+        <div class="dash-panel-header">
+          <h3>Top 50 Product Trios</h3>
+          <span class="panel-meta">% of all orders containing all three products</span>
+        </div>
+        <div class="dash-panel-body" id="dash-trios-list" style="max-height:500px;">
           <div class="dash-loading">Upload data to see results</div>
         </div>
       </div>
@@ -454,6 +480,7 @@ async function loadDashboard() {
 
   document.getElementById('dash-products-list').innerHTML = '<div class="dash-loading"><span id="dash-spinner"></span> Loading…</div>';
   document.getElementById('dash-pairs-list').innerHTML    = '<div class="dash-loading"> </div>';
+  document.getElementById('dash-trios-list').innerHTML   = '<div class="dash-loading"> </div>';
 
   const params = new URLSearchParams({ limit: 25 });
   if (from) params.set('date_from', from);
@@ -475,6 +502,7 @@ async function loadDashboard() {
 
     renderTopProducts(data.top_products);
     renderTopPairs(data.top_pairs);
+    renderTopTrios(data.top_trios || []);
   } catch(err) {
     document.getElementById('dash-products-list').innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
     document.getElementById('dash-pairs-list').innerHTML    = `<div class="dash-empty"> </div>`;
@@ -519,6 +547,30 @@ function renderTopPairs(items) {
         </div>
       </div>
       <div class="pair-bar-wrap"><div class="pair-bar-fill" style="width:${Math.round(p.pct/max*100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderTopTrios(items) {
+  const el = document.getElementById('dash-trios-list');
+  if (!items.length) { el.innerHTML = '<div class="dash-empty">No three-product combinations found — not enough orders with 3+ items</div>'; return; }
+  const max = items[0].pct;
+  el.innerHTML = items.map((t, i) => `
+    <div class="trio-row">
+      <div class="trio-top">
+        <div class="trio-rank">${i+1}</div>
+        <div class="trio-names">
+          <div class="trio-product" title="${esc(t.product_a.name)}">${esc(t.product_a.name)}</div>
+          <div class="trio-sep">+</div>
+          <div class="trio-product" title="${esc(t.product_b.name)}">${esc(t.product_b.name)}</div>
+          <div class="trio-sep">+</div>
+          <div class="trio-product" title="${esc(t.product_c.name)}">${esc(t.product_c.name)}</div>
+        </div>
+        <div class="trio-right">
+          <div class="trio-pct">${t.pct}%</div>
+          <div class="trio-count">${t.count.toLocaleString()} orders</div>
+        </div>
+      </div>
+      <div class="trio-bar-wrap"><div class="trio-bar-fill" style="width:${Math.round(t.pct/max*100)}%"></div></div>
     </div>`).join('');
 }
 
