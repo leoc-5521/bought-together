@@ -2,6 +2,7 @@ import io
 import os
 import csv
 import pickle
+import gc
 from collections import defaultdict
 from typing import Optional
 from datetime import datetime, date
@@ -28,9 +29,9 @@ DATA_FILE = "/tmp/orders_data.pkl"
 def save_to_disk(om, s):
     try:
         with open(DATA_FILE, "wb") as f:
-            pickle.dump({"orders_map": om, "stats": s}, f)
+            pickle.dump({"orders_map": om, "stats": s}, f, protocol=4)
     except Exception as e:
-        print(f"Warning: could not save data to disk: {e}")
+        print(f"Warning: could not save to disk: {e}")
 
 def load_from_disk():
     try:
@@ -39,7 +40,7 @@ def load_from_disk():
                 data = pickle.load(f)
                 return data["orders_map"], data["stats"]
     except Exception as e:
-        print(f"Warning: could not load data from disk: {e}")
+        print(f"Warning: could not load from disk: {e}")
     return {}, {}
 
 orders_map, stats = load_from_disk()
@@ -110,10 +111,13 @@ async def upload(file: UploadFile = File(...)):
     global orders_map, stats
     content = await file.read()
     headers, rows = parse_csv_bytes(content)
+    del content  # free memory immediately
     col_map = detect_columns(headers)
     if "order_id" not in col_map or "product_name" not in col_map:
         return {"status": "needs_mapping", "headers": headers, "col_map": col_map, "row_count": len(rows)}
     orders_map, stats = build_orders_map(rows, col_map)
+    del rows
+    gc.collect()
     save_to_disk(orders_map, stats)
     return {"status": "ok", **stats}
 
@@ -135,23 +139,28 @@ async def upload_with_mapping(
     global orders_map, stats
     content = await file.read()
     _, rows = parse_csv_bytes(content)
+    del content
     col_map = {"order_id": order_id_col, "product_name": product_name_col}
     if sku_col >= 0:          col_map["sku"] = sku_col
     if product_id_col >= 0:   col_map["product_id"] = product_id_col
     if product_type_col >= 0: col_map["product_type"] = product_type_col
     if date_col >= 0:         col_map["created_at"] = date_col
     orders_map, stats = build_orders_map(rows, col_map)
+    del rows
+    gc.collect()
     save_to_disk(orders_map, stats)
     return {"status": "ok", **stats}
 
 def build_orders_map(rows, col_map):
+    # Use __slots__-style plain tuples to reduce memory vs dicts
     om = defaultdict(lambda: {"products": [], "date": None})
 
     def get(row, field):
         idx = col_map.get(field)
         if idx is None or idx >= len(row):
             return ""
-        return str(row[idx]).strip()
+        v = row[idx]
+        return str(v).strip() if v is not None else ""
 
     for row in rows:
         order_id = get(row, "order_id")
@@ -163,27 +172,41 @@ def build_orders_map(rows, col_map):
         if om[order_id]["date"] is None and raw_date:
             om[order_id]["date"] = parse_date(raw_date)
         key = f"{name}|{sku}"
-        if not any(p["_key"] == key for p in om[order_id]["products"]):
-            om[order_id]["products"].append({"name": name, "sku": sku, "id": pid, "type": ptype, "_key": key})
+        existing_keys = {p["_key"] for p in om[order_id]["products"]}
+        if key not in existing_keys:
+            # Only store what we need — drop empty strings to save memory
+            p = {"_key": key, "name": name}
+            if sku:   p["sku"]  = sku
+            if pid:   p["id"]   = pid
+            if ptype: p["type"] = ptype
+            om[order_id]["products"].append(p)
 
     om = dict(om)
+
     all_names = set(); all_skus = set(); all_types = set(); all_dates = []
     for order in om.values():
         for p in order["products"]:
-            if p["name"]: all_names.add(p["name"])
-            if p["sku"]:  all_skus.add(p["sku"])
-            if p["type"]: all_types.add(p["type"])
+            all_names.add(p["name"])
+            if p.get("sku"):  all_skus.add(p["sku"])
+            if p.get("type"): all_types.add(p["type"])
         if order["date"]: all_dates.append(order["date"])
 
     s = {
-        "order_count": len(om), "product_count": len(all_names),
-        "sku_count": len(all_skus), "type_count": len(all_types),
-        "types": sorted(all_types), "names": sorted(all_names),
-        "min_date": str(min(all_dates)) if all_dates else None,
-        "max_date": str(max(all_dates)) if all_dates else None,
-        "has_dates": bool(all_dates),
+        "order_count":   len(om),
+        "product_count": len(all_names),
+        "sku_count":     len(all_skus),
+        "type_count":    len(all_types),
+        "types":         sorted(all_types),
+        "names":         sorted(all_names),
+        "min_date":      str(min(all_dates)) if all_dates else None,
+        "max_date":      str(max(all_dates)) if all_dates else None,
+        "has_dates":     bool(all_dates),
     }
     return om, s
+
+def get_p(p, field):
+    """Safe field getter for product dicts (some fields may be missing if empty)."""
+    return p.get(field, "")
 
 # ── Stats endpoint ───────────────────────────────────────────────
 @app.get("/stats")
@@ -205,120 +228,113 @@ def dashboard(
     df = parse_date(date_from) if date_from else None
     dt = parse_date(date_to)   if date_to   else None
 
-    # Filter orders by date
-    filtered_orders = [
-        order for order in orders_map.values()
-        if in_date_range(order, df, dt)
-    ]
+    filtered_orders = [o for o in orders_map.values() if in_date_range(o, df, dt)]
     total_orders = len(filtered_orders)
-
     if total_orders == 0:
         return {"total_orders": 0, "top_products": [], "top_pairs": []}
 
-    # ── Top products: how often each product appears alongside any other product
-    # "co-purchase rate" = orders where product appeared WITH at least one other item / total orders with that product
-    product_total_orders: dict[str, int] = defaultdict(int)   # orders containing this product
-    product_copurchase_orders: dict[str, int] = defaultdict(int)  # orders with this product + at least one other
-    product_data: dict[str, dict] = {}
+    # ── Top products
+    product_total: dict[str, int] = defaultdict(int)
+    product_multi: dict[str, int] = defaultdict(int)
+    product_data:  dict[str, dict] = {}
 
     for order in filtered_orders:
-        products = order["products"]
-        multi = len(products) > 1
-        for p in products:
+        prods = order["products"]
+        multi = len(prods) > 1
+        for p in prods:
             k = p["_key"]
-            product_total_orders[k] += 1
-            if multi:
-                product_copurchase_orders[k] += 1
+            product_total[k] += 1
+            if multi: product_multi[k] += 1
             if k not in product_data:
-                product_data[k] = {f: p[f] for f in ("name","sku","id","type")}
+                product_data[k] = {"name": p["name"], "sku": get_p(p,"sku"), "id": get_p(p,"id"), "type": get_p(p,"type")}
 
     top_products = sorted(
-        [
-            {
-                **product_data[k],
-                "total_orders": product_total_orders[k],
-                "copurchase_orders": product_copurchase_orders[k],
-                "copurchase_pct": round(product_copurchase_orders[k] / product_total_orders[k] * 100, 1)
-                    if product_total_orders[k] else 0,
-            }
-            for k in product_data
-        ],
+        [{"name": product_data[k]["name"], "sku": product_data[k]["sku"],
+          "id": product_data[k]["id"], "type": product_data[k]["type"],
+          "total_orders": product_total[k], "copurchase_orders": product_multi[k],
+          "copurchase_pct": round(product_multi[k] / product_total[k] * 100, 1) if product_total[k] else 0}
+         for k in product_data],
         key=lambda x: (-x["copurchase_pct"], -x["copurchase_orders"])
     )[:limit]
 
-    # ── Top pairs: most common two-product combinations
+    # ── Top pairs
     pair_count: dict[tuple, int] = defaultdict(int)
-    pair_data: dict[tuple, dict] = {}
+    pair_data:  dict[tuple, dict] = {}
 
     for order in filtered_orders:
-        products = order["products"]
-        if len(products) < 2:
+        prods = order["products"]
+        if len(prods) < 2:
             continue
-        # Sort keys so (A,B) and (B,A) are treated the same
-        keys = sorted(set(p["_key"] for p in products))
+        keys = sorted({p["_key"] for p in prods})
+        prod_lookup = {p["_key"]: p for p in prods}
         for ka, kb in combinations(keys, 2):
             pair = (ka, kb)
             pair_count[pair] += 1
             if pair not in pair_data:
-                pa = next(p for p in products if p["_key"] == ka)
-                pb = next(p for p in products if p["_key"] == kb)
+                pa, pb = prod_lookup[ka], prod_lookup[kb]
                 pair_data[pair] = {
-                    "product_a": {f: pa[f] for f in ("name","sku","id","type")},
-                    "product_b": {f: pb[f] for f in ("name","sku","id","type")},
+                    "product_a": {"name": pa["name"], "sku": get_p(pa,"sku"), "id": get_p(pa,"id"), "type": get_p(pa,"type")},
+                    "product_b": {"name": pb["name"], "sku": get_p(pb,"sku"), "id": get_p(pb,"id"), "type": get_p(pb,"type")},
                 }
 
     top_pairs = sorted(
-        [
-            {
-                **pair_data[pair],
-                "count": cnt,
-                "pct": round(cnt / total_orders * 100, 1),
-            }
-            for pair, cnt in pair_count.items()
-        ],
+        [{"product_a": pair_data[p]["product_a"], "product_b": pair_data[p]["product_b"],
+          "count": c, "pct": round(c / total_orders * 100, 1)}
+         for p, c in pair_count.items()],
         key=lambda x: (-x["pct"], -x["count"])
     )[:limit]
 
-    # ── Top trios: most common three-product combinations
+    return {"total_orders": total_orders, "top_products": top_products, "top_pairs": top_pairs}
+
+# ── Trios endpoint (separate, on-demand) ─────────────────────────
+@app.get("/trios")
+def trios(
+    date_from: Optional[str] = Query(None),
+    date_to:   Optional[str] = Query(None),
+):
+    if not orders_map:
+        raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
+
+    df = parse_date(date_from) if date_from else None
+    dt = parse_date(date_to)   if date_to   else None
+
+    filtered_orders = [o for o in orders_map.values() if in_date_range(o, df, dt)]
+    total_orders = len(filtered_orders)
+    if total_orders == 0:
+        return {"total_orders": 0, "top_trios": []}
+
     trio_count: dict[tuple, int] = defaultdict(int)
     trio_data:  dict[tuple, dict] = {}
 
     for order in filtered_orders:
-        products = order["products"]
-        if len(products) < 3:
+        prods = order["products"]
+        if len(prods) < 3:
             continue
-        keys = sorted(set(p["_key"] for p in products))
+        keys = sorted({p["_key"] for p in prods})
+        prod_lookup = {p["_key"]: p for p in prods}
         for ka, kb, kc in combinations(keys, 3):
             trio = (ka, kb, kc)
             trio_count[trio] += 1
             if trio not in trio_data:
-                pa = next(p for p in products if p["_key"] == ka)
-                pb = next(p for p in products if p["_key"] == kb)
-                pc = next(p for p in products if p["_key"] == kc)
+                pa, pb, pc = prod_lookup[ka], prod_lookup[kb], prod_lookup[kc]
                 trio_data[trio] = {
-                    "product_a": {f: pa[f] for f in ("name","sku","id","type")},
-                    "product_b": {f: pb[f] for f in ("name","sku","id","type")},
-                    "product_c": {f: pc[f] for f in ("name","sku","id","type")},
+                    "product_a": {"name": pa["name"], "sku": get_p(pa,"sku"), "id": get_p(pa,"id"), "type": get_p(pa,"type")},
+                    "product_b": {"name": pb["name"], "sku": get_p(pb,"sku"), "id": get_p(pb,"id"), "type": get_p(pb,"type")},
+                    "product_c": {"name": pc["name"], "sku": get_p(pc,"sku"), "id": get_p(pc,"id"), "type": get_p(pc,"type")},
                 }
 
     top_trios = sorted(
-        [
-            {
-                **trio_data[trio],
-                "count": cnt,
-                "pct": round(cnt / total_orders * 100, 1),
-            }
-            for trio, cnt in trio_count.items()
-        ],
+        [{"product_a": trio_data[t]["product_a"], "product_b": trio_data[t]["product_b"],
+          "product_c": trio_data[t]["product_c"], "count": c, "pct": round(c / total_orders * 100, 1)}
+         for t, c in trio_count.items()],
         key=lambda x: (-x["pct"], -x["count"])
     )[:50]
 
-    return {
-        "total_orders": total_orders,
-        "top_products": top_products,
-        "top_pairs": top_pairs,
-        "top_trios": top_trios,
-    }
+    # Free memory
+    del trio_count, trio_data, filtered_orders
+    gc.collect()
+
+    return {"total_orders": total_orders, "top_trios": top_trios}
 
 # ── Search endpoint ──────────────────────────────────────────────
 @app.get("/search")
@@ -334,9 +350,8 @@ def search(
     if not orders_map:
         raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
 
-    nl = (name or "").lower(); sl = (sku or "").lower()
+    nl = (name or "").lower(); sl = (sku  or "").lower()
     il = (pid  or "").lower(); tl = (type or "").lower()
-
     if not any([nl, sl, il, tl]):
         raise HTTPException(status_code=400, detail="Provide at least one search term")
 
@@ -344,8 +359,10 @@ def search(
     dt = parse_date(date_to)   if date_to   else None
 
     def is_match(p):
-        return ((nl and nl in p["name"].lower()) or (sl and sl in p["sku"].lower()) or
-                (il and il in p["id"].lower())   or (tl and tl in p["type"].lower()))
+        return ((nl and nl in p["name"].lower()) or
+                (sl and sl in get_p(p,"sku").lower()) or
+                (il and il in get_p(p,"id").lower())  or
+                (tl and tl in get_p(p,"type").lower()))
 
     matching_orders = [
         order["products"] for order in orders_map.values()
@@ -363,11 +380,13 @@ def search(
             key = p["_key"]
             co_count[key] += 1
             if key not in co_data:
-                co_data[key] = {k: v for k, v in p.items() if k != "_key"}
+                co_data[key] = {"name": p["name"], "sku": get_p(p,"sku"), "id": get_p(p,"id"), "type": get_p(p,"type")}
 
     total = len(matching_orders)
     results = sorted(
-        [{**co_data[k], "count": c, "pct": round(c / total * 100, 1)} for k, c in co_count.items()],
+        [{"name": co_data[k]["name"], "sku": co_data[k]["sku"], "id": co_data[k]["id"],
+          "type": co_data[k]["type"], "count": c, "pct": round(c / total * 100, 1)}
+         for k, c in co_count.items()],
         key=lambda x: (-x["pct"], -x["count"])
     )[:limit]
 
