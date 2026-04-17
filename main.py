@@ -279,10 +279,45 @@ def dashboard(
         key=lambda x: (-x["pct"], -x["count"])
     )[:limit]
 
+    # ── Top trios: most common three-product combinations
+    trio_count: dict[tuple, int] = defaultdict(int)
+    trio_data:  dict[tuple, dict] = {}
+
+    for order in filtered_orders:
+        products = order["products"]
+        if len(products) < 3:
+            continue
+        keys = sorted(set(p["_key"] for p in products))
+        for ka, kb, kc in combinations(keys, 3):
+            trio = (ka, kb, kc)
+            trio_count[trio] += 1
+            if trio not in trio_data:
+                pa = next(p for p in products if p["_key"] == ka)
+                pb = next(p for p in products if p["_key"] == kb)
+                pc = next(p for p in products if p["_key"] == kc)
+                trio_data[trio] = {
+                    "product_a": {f: pa[f] for f in ("name","sku","id","type")},
+                    "product_b": {f: pb[f] for f in ("name","sku","id","type")},
+                    "product_c": {f: pc[f] for f in ("name","sku","id","type")},
+                }
+
+    top_trios = sorted(
+        [
+            {
+                **trio_data[trio],
+                "count": cnt,
+                "pct": round(cnt / total_orders * 100, 1),
+            }
+            for trio, cnt in trio_count.items()
+        ],
+        key=lambda x: (-x["pct"], -x["count"])
+    )[:50]
+
     return {
         "total_orders": total_orders,
         "top_products": top_products,
         "top_pairs": top_pairs,
+        "top_trios": top_trios,
     }
 
 # ── Search endpoint ──────────────────────────────────────────────
