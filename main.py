@@ -384,16 +384,20 @@ def trios(
 # ── Type vs Type endpoint ────────────────────────────────────────
 @app.get("/type-pairs")
 def type_pairs(
-    date_from: Optional[str] = Query(None),
-    date_to:   Optional[str] = Query(None),
+    date_from:   Optional[str] = Query(None),
+    date_to:     Optional[str] = Query(None),
+    filter_type: Optional[str] = Query(None),  # if set, only show pairs involving this type
 ):
     if not orders_map:
         raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
 
     df = parse_date(date_from) if date_from else None
     dt = parse_date(date_to)   if date_to   else None
+    ft = filter_type.strip().lower() if filter_type else None
 
     type_pair_count: dict[tuple, int] = defaultdict(int)
+    # track orders that contain the filter type (for percentage denominator)
+    matching_orders = 0
     total_orders = 0
 
     for order in orders_map.values():
@@ -401,18 +405,34 @@ def type_pairs(
             continue
         total_orders += 1
         prods = order["products"]
-        # Get unique non-empty types in this order
         types = sorted({get_p(p, "type") for p in prods if get_p(p, "type")})
         if len(types) < 2:
             continue
-        for ta, tb in combinations(types, 2):
-            type_pair_count[(ta, tb)] += 1
 
-    if total_orders == 0:
-        return {"total_orders": 0, "top_type_pairs": []}
+        if ft:
+            # Only count this order if the filter type is present
+            order_types_lower = [t.lower() for t in types]
+            if not any(ft == tl for tl in order_types_lower):
+                continue
+            matching_orders += 1
+            # Find the actual cased version of the filter type
+            matched_type = next(t for t in types if t.lower() == ft)
+            # Pair matched type with every other type in this order
+            for other in types:
+                if other.lower() == ft:
+                    continue
+                pair = tuple(sorted([matched_type, other]))
+                type_pair_count[pair] += 1
+        else:
+            matching_orders += 1
+            for ta, tb in combinations(types, 2):
+                type_pair_count[(ta, tb)] += 1
+
+    if matching_orders == 0:
+        return {"total_orders": total_orders, "matching_orders": 0, "top_type_pairs": []}
 
     top_type_pairs = sorted(
-        [{"type_a": ta, "type_b": tb, "count": c, "pct": round(c / total_orders * 100, 1)}
+        [{"type_a": ta, "type_b": tb, "count": c, "pct": round(c / matching_orders * 100, 1)}
          for (ta, tb), c in type_pair_count.items()],
         key=lambda x: (-x["pct"], -x["count"])
     )[:50]
@@ -420,7 +440,7 @@ def type_pairs(
     del type_pair_count
     gc.collect()
 
-    return {"total_orders": total_orders, "top_type_pairs": top_type_pairs}
+    return {"total_orders": total_orders, "matching_orders": matching_orders, "top_type_pairs": top_type_pairs}
 
 # ── Search endpoint ──────────────────────────────────────────────
 @app.get("/search")
