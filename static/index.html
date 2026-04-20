@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,43 +7,55 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;0,900;1,300&display=swap');
 
+  /* ── Theme tokens ── */
   :root {
     --bg: #0e0e0e; --surface: #161616; --surface2: #1e1e1e;
     --border: #2a2a2a; --accent: #c8f04a; --text: #f0f0f0;
     --muted: #666; --danger: #ff6b6b; --radius: 10px;
+    --shadow: rgba(0,0,0,0.4);
   }
+  [data-theme="light"] {
+    --bg: #f5f5f0; --surface: #ffffff; --surface2: #ebebeb;
+    --border: #d4d4cc; --accent: #5a8a00; --text: #1a1a1a;
+    --muted: #888; --danger: #cc3333; --shadow: rgba(0,0,0,0.1);
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; min-height: 100vh; font-size: 13px; line-height: 1.6; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; min-height: 100vh; font-size: 13px; line-height: 1.6; transition: background 0.2s, color 0.2s; }
 
   /* ── Header ── */
-  header { border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 100; height: 60px; }
-  .logo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
+  header { border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 100; height: 60px; gap: 16px; }
+  .logo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; flex-shrink: 0; }
   .logo span { color: var(--accent); }
-  .status-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  /* Theme toggle */
+  .theme-toggle { background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px; font-size: 11px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: 'DM Mono', monospace; transition: all 0.15s; white-space: nowrap; }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  .status-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
   .status-pill.loaded .dot { background: var(--accent); }
   .status-pill.loaded { color: var(--text); }
 
   /* ── Tabs ── */
-  .tab-bar { display: none; border-bottom: 1px solid var(--border); padding: 0 32px; background: var(--bg); }
+  .tab-bar { display: none; border-bottom: 1px solid var(--border); padding: 0 32px; background: var(--bg); overflow-x: auto; }
   .tab-bar.visible { display: flex; }
-  .tab { padding: 14px 20px; font-size: 12px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; }
+  .tab { padding: 14px 18px; font-size: 12px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; white-space: nowrap; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  /* ── Main layout ── */
-  main { max-width: 1100px; margin: 0 auto; padding: 40px 32px 80px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 40px 32px 80px; }
   .page { display: none; }
   .page.active { display: block; }
 
-  /* ── Shared components ── */
+  /* ── Shared ── */
   .section-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
   .help-text { background: var(--surface); border-left: 3px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 14px 18px; font-size: 12px; color: var(--muted); margin-bottom: 24px; line-height: 1.8; }
   .help-text strong { color: var(--text); }
-  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
   .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 32px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--surface); position: relative; }
-  .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: #1a1f0f; }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: var(--surface2); }
   .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .upload-zone h2 { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; margin-bottom: 8px; }
   .upload-zone p { color: var(--muted); font-size: 12px; }
@@ -51,10 +63,11 @@
   .upload-icon { font-size: 36px; margin-bottom: 12px; display: block; }
 
   .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #0e0e0e; border: none; border-radius: var(--radius); padding: 10px 20px; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; margin-top: 20px; }
-  .btn:hover { background: #d4f85c; transform: translateY(-1px); }
+  [data-theme="light"] .btn { color: #fff; }
+  .btn:hover { opacity: 0.88; transform: translateY(-1px); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--surface2); }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
   .btn.sm { padding: 7px 14px; font-size: 11px; margin-top: 0; }
 
   #progress-bar-wrap { display: none; margin-top: 20px; }
@@ -71,9 +84,9 @@
   .stat-box .val.date-val { font-size: 13px; padding-top: 8px; line-height: 1.6; }
   .stat-box .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 
-  /* ── Date range widget (shared) ── */
-  .date-range-wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .date-range-widget { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; overflow: hidden; transition: border-color 0.15s; flex: 1; min-width: 300px; }
+  /* ── Date range widget ── */
+  .date-range-wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .date-range-widget { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; overflow: hidden; transition: border-color 0.15s; flex: 1; min-width: 280px; }
   .date-range-widget:focus-within, .date-range-widget.active { border-color: var(--accent); }
   .date-range-widget .dr-label { padding: 10px 14px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; border-right: 1px solid var(--border); background: var(--surface2); }
   .date-range-widget.active .dr-label { color: var(--accent); }
@@ -81,13 +94,14 @@
   .date-range-widget input[type="date"] { background: transparent; border: none; border-radius: 0; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; padding: 10px 0; width: 130px; flex-shrink: 0; }
   .date-range-widget input[type="date"]:focus { outline: none; }
   .date-range-widget input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
+  [data-theme="light"] .date-range-widget input[type="date"]::-webkit-calendar-picker-indicator { filter: none; }
   .date-range-widget .dr-sep { color: var(--muted); font-size: 11px; padding: 0 6px; }
   .dr-clear { padding: 0 12px; background: none; border: none; border-left: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 18px; align-self: stretch; display: flex; align-items: center; transition: color 0.15s; }
   .dr-clear.hidden { display: none; }
   .dr-clear:hover { color: var(--danger); }
 
   /* ── Mapper ── */
-  #mapper-section { display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:32px; }
+  #mapper-section { display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:32px; margin-top:20px; }
   #mapper-section.visible { display:block; }
   #mapper-section h3 { font-family:'Fraunces',serif; font-size:16px; font-weight:600; margin-bottom:6px; }
   #mapper-section p { color:var(--muted); font-size:12px; margin-bottom:20px; }
@@ -107,13 +121,13 @@
   .combo-clear { position: absolute; right: 30px; top: 50%; transform: translateY(-50%); color: var(--muted); cursor: pointer; font-size: 16px; display: none; background: none; border: none; padding: 0; line-height: 1; }
   .combo-clear.visible { display: block; }
   .combo-clear:hover { color: var(--text); }
-  .combo-dropdown { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface2); border: 1px solid var(--accent); border-radius: var(--radius); z-index: 200; max-height: 240px; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+  .combo-dropdown { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface2); border: 1px solid var(--accent); border-radius: var(--radius); z-index: 200; max-height: 240px; overflow-y: auto; box-shadow: 0 8px 32px var(--shadow); }
   .combo-dropdown.open { display: block; }
   .combo-dropdown::-webkit-scrollbar { width: 4px; }
   .combo-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .combo-option { padding: 10px 14px; cursor: pointer; font-size: 12px; border-bottom: 1px solid var(--border); transition: background 0.1s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .combo-option:last-child { border-bottom: none; }
-  .combo-option:hover, .combo-option.highlighted { background: #1a2a05; color: var(--accent); }
+  .combo-option:hover, .combo-option.highlighted { background: var(--surface); color: var(--accent); }
   .combo-option.no-results { color: var(--muted); cursor: default; }
   .combo-option.no-results:hover { background: transparent; color: var(--muted); }
 
@@ -122,21 +136,20 @@
   @media(max-width:600px){ .search-grid { grid-template-columns: 1fr; } }
   .search-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .search-actions .btn { margin-top: 0; }
+  .date-filter-row { display: none; }
+  .date-filter-row.visible { display: block; }
 
-  #date-filter-row-search { display: none; margin-bottom: 12px; }
-  #date-filter-row-search.visible { display: block; }
-
-  /* ── Result cards ── */
-  #results-section { display: none; }
+  /* ── Result cards (search) ── */
+  #results-section { display: none; margin-top: 28px; }
   #results-section.visible { display: block; }
   .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
   .results-header h3 { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; }
   .results-header h3 span { color: var(--accent); }
   .results-meta { font-size: 11px; color: var(--muted); }
   .product-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; transition: border-color 0.15s; animation: fadeUp 0.22s ease both; }
-  .product-card:hover { border-color: #3a3a3a; }
+  .product-card:hover { border-color: var(--muted); }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
-  .product-card:nth-child(2){animation-delay:.04s}.product-card:nth-child(3){animation-delay:.08s}.product-card:nth-child(4){animation-delay:.12s}.product-card:nth-child(5){animation-delay:.16s}
+  .product-card:nth-child(2){animation-delay:.04s}.product-card:nth-child(3){animation-delay:.08s}.product-card:nth-child(4){animation-delay:.12s}
   .pc-rank { font-size:10px; color:var(--muted); margin-bottom:3px; }
   .pc-name { font-family:'Fraunces',serif; font-size:15px; font-weight:600; margin-bottom:3px; }
   .pc-meta { font-size:11px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
@@ -145,78 +158,51 @@
   .pc-count { font-size:11px; color:var(--muted); }
   .bar-wrap { height:3px; background:var(--border); border-radius:2px; margin-top:10px; overflow:hidden; grid-column:1/-1; }
   .bar-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 0.6s cubic-bezier(0.22,1,0.36,1); }
-
   #results-list { max-height:70vh; overflow-y:auto; padding-right:4px; }
   #results-list::-webkit-scrollbar { width:4px; }
   #results-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
-  /* ── Dashboard ── */
-  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  /* ── Dashboard panels ── */
+  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
   .dash-header h2 { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; }
-  .dash-header h2 span { color: var(--accent); }
+  .dash-header h2 span { color: var(--accent); font-size: 14px; font-family: 'DM Mono', monospace; font-weight: 400; }
 
-  .dash-date-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
-  .dash-date-bar .field-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; }
-
-  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  .dash-grid-full { grid-column: 1 / -1; }
-  @media(max-width:750px){ .dash-grid { grid-template-columns: 1fr; } }
-
-  .dash-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .dash-panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .dash-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+  .dash-panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .dash-panel-header h3 { font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600; }
   .dash-panel-header .panel-meta { font-size: 10px; color: var(--muted); }
-  .dash-panel-body { padding: 8px 0; max-height: 620px; overflow-y: auto; }
+  .dash-panel-header .panel-actions { display: flex; align-items: center; gap: 10px; }
+  .dash-panel-body { padding: 8px 0; max-height: 560px; overflow-y: auto; }
   .dash-panel-body::-webkit-scrollbar { width: 4px; }
   .dash-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  /* Dashboard rows */
-  .dash-row { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  .dash-row:last-child { border-bottom: none; }
-  .dash-row:hover { background: var(--surface2); }
-  .dash-rank { font-size: 11px; color: var(--muted); width: 24px; flex-shrink: 0; text-align: right; }
-  .dash-info { flex: 1; min-width: 0; }
-  .dash-name { font-family: 'Fraunces', serif; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dash-sub { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-  .dash-right { text-align: right; flex-shrink: 0; }
-  .dash-pct { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: var(--accent); line-height: 1; }
-  .dash-count { font-size: 10px; color: var(--muted); }
-  .dash-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
-  .dash-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+  /* Pair / trio rows */
+  .pair-row, .trio-row, .type-pair-row { padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .pair-row:last-child, .trio-row:last-child, .type-pair-row:last-child { border-bottom: none; }
+  .pair-row:hover, .trio-row:hover, .type-pair-row:hover { background: var(--surface2); }
 
-  /* Pair rows */
-  .pair-row { padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  .pair-row:last-child { border-bottom: none; }
-  .pair-row:hover { background: var(--surface2); }
-  .pair-top { display: flex; align-items: center; gap: 10px; }
-  .pair-rank { font-size: 11px; color: var(--muted); width: 24px; flex-shrink: 0; text-align: right; }
-  .pair-names { flex: 1; min-width: 0; }
-  .pair-a { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pair-plus { font-size: 10px; color: var(--muted); margin: 1px 0; }
-  .pair-b { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pair-right { text-align: right; flex-shrink: 0; }
-  .pair-pct { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: var(--accent); line-height: 1; }
-  .pair-count { font-size: 10px; color: var(--muted); }
-  .pair-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
-  .pair-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+  .row-top { display: flex; align-items: center; gap: 10px; }
+  .row-rank { font-size: 11px; color: var(--muted); width: 26px; flex-shrink: 0; text-align: right; }
+  .row-names { flex: 1; min-width: 0; }
+  .row-product { font-family: 'Fraunces', serif; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-type { font-family: 'Fraunces', serif; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-sep { font-size: 10px; color: var(--muted); margin: 2px 0; }
+  .row-right { text-align: right; flex-shrink: 0; min-width: 70px; }
+  .row-pct { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 900; color: var(--accent); line-height: 1; }
+  .row-count { font-size: 10px; color: var(--muted); }
+  .row-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .row-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
 
-  /* Trio rows */
-  .trio-row { padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  .trio-row:last-child { border-bottom: none; }
-  .trio-row:hover { background: var(--surface2); }
-  .trio-top { display: flex; align-items: center; gap: 10px; }
-  .trio-rank { font-size: 11px; color: var(--muted); width: 24px; flex-shrink: 0; text-align: right; }
-  .trio-names { flex: 1; min-width: 0; }
-  .trio-product { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .trio-sep { font-size: 10px; color: var(--muted); margin: 1px 0; }
-  .trio-right { text-align: right; flex-shrink: 0; }
-  .trio-pct { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: var(--accent); line-height: 1; }
-  .trio-count { font-size: 10px; color: var(--muted); }
-  .trio-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
-  .trio-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+  /* placeholder / loading / empty */
+  .dash-placeholder { text-align: center; padding: 36px 20px; }
+  .dash-placeholder p { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.7; }
+  .dash-loading { text-align: center; padding: 36px 20px; color: var(--muted); font-size: 12px; }
+  .dash-empty { text-align: center; padding: 36px 20px; color: var(--muted); font-size: 12px; }
 
-  .dash-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 12px; }
-  .dash-loading { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 12px; }
+  /* ── Type-vs-type page ── */
+  .type-page-header { margin-bottom: 24px; }
+  .type-page-header h2 { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; margin-bottom: 6px; }
+  .type-page-header p { font-size: 12px; color: var(--muted); }
 
   /* ── Toast & spinner ── */
   .toast { position:fixed; bottom:24px; right:24px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 20px; font-size:12px; opacity:0; transform:translateY(12px); transition:all 0.25s; z-index:999; max-width:320px; }
@@ -225,8 +211,6 @@
   .toast.success { border-color:var(--accent); color:var(--accent); }
   #spinner { display:none; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
   #spinner.visible { display:inline-block; }
-  #dash-spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:6px; }
-  #dash-spinner.hidden { display:none; }
   @keyframes spin { to{transform:rotate(360deg)} }
 </style>
 </head>
@@ -234,41 +218,41 @@
 
 <header>
   <div class="logo">bought<span>·</span>together</div>
-  <div class="status-pill" id="status-pill">
-    <div class="dot"></div>
-    <span id="status-text">No data loaded</span>
+  <div class="header-right">
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">☀ Light mode</button>
+    <div class="status-pill" id="status-pill">
+      <div class="dot"></div>
+      <span id="status-text">No data loaded</span>
+    </div>
   </div>
 </header>
 
-<!-- Tab bar (hidden until data loaded) -->
 <div class="tab-bar" id="tab-bar">
   <div class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" id="tab-types" onclick="switchTab('types')">🏷 Type vs Type</div>
   <div class="tab" id="tab-search" onclick="switchTab('search')">🔍 Search</div>
 </div>
 
 <main>
 
-  <!-- ══════════════════════════════════════════════
-       UPLOAD PAGE (shown before data loaded)
-  ══════════════════════════════════════════════ -->
+  <!-- ══ UPLOAD ══ -->
   <div id="upload-page">
     <div class="section-label">Get started · Upload your Shopify orders export</div>
     <div class="help-text">
       <strong>How to export from Shopify:</strong> Go to <em>Orders → Export → All orders → Export orders (CSV)</em>.<br>
-      Large files with 70k+ orders work fine. <strong>Data is remembered between sessions</strong> — you won't need to re-upload every time.
+      Large files with 100k+ orders work fine. <strong>Data is remembered between sessions.</strong>
     </div>
     <div class="upload-zone" id="drop-zone">
       <input type="file" id="file-input" accept=".csv,.xlsx,.xls" />
       <span class="upload-icon">📦</span>
       <h2>Drop your orders CSV here</h2>
-      <p>Supports <strong>.csv</strong> files from Shopify · Handles 100k+ orders</p>
+      <p>Supports <strong>.csv</strong> files from Shopify</p>
       <button class="btn" id="choose-btn" onclick="document.getElementById('file-input').click();event.stopPropagation();">Choose File</button>
     </div>
     <div id="progress-bar-wrap">
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
       <div class="progress-label" id="progress-label">Uploading…</div>
     </div>
-
     <div id="mapper-section">
       <h3>Map your columns</h3>
       <p>We couldn't auto-detect all required columns. Please match your spreadsheet columns to the fields below.</p>
@@ -277,9 +261,7 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════
-       STATS BAR (shown on both tabs)
-  ══════════════════════════════════════════════ -->
+  <!-- ══ STATS BAR ══ -->
   <div id="stats-bar">
     <div class="stat-box"><span class="val" id="stat-orders">0</span><span class="lbl">Orders</span></div>
     <div class="stat-box"><span class="val" id="stat-products">0</span><span class="lbl">Products</span></div>
@@ -291,66 +273,105 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════
-       DASHBOARD PAGE
-  ══════════════════════════════════════════════ -->
+  <!-- ══ DASHBOARD PAGE ══ -->
   <div class="page active" id="page-dashboard">
-
     <div class="dash-header">
       <h2>Dashboard <span id="dash-order-count"></span></h2>
       <button class="btn sm secondary" onclick="clearData()">🗑 Clear Data</button>
     </div>
 
-    <!-- Date filter for dashboard -->
-    <div id="date-filter-row-dash" style="display:none; margin-bottom:20px;">
-      <div class="dash-date-bar">
-        <span class="field-label">Filter by date:</span>
+    <!-- Date filter -->
+    <div id="dash-date-row" style="display:none">
+      <div class="date-range-wrap">
         <div class="date-range-widget" id="dash-date-widget">
           <div class="dr-label">From</div>
-          <div class="dr-part">
-            <input type="date" id="dash-date-from" oninput="onDashDateChange()" />
-          </div>
+          <div class="dr-part"><input type="date" id="dash-date-from" oninput="onDashDateChange()" /></div>
           <div class="dr-sep">→</div>
-          <div class="dr-part">
-            <input type="date" id="dash-date-to" oninput="onDashDateChange()" />
-          </div>
-          <button class="dr-clear hidden" id="dash-dr-clear" onclick="clearDashDate()" title="Clear">×</button>
+          <div class="dr-part"><input type="date" id="dash-date-to" oninput="onDashDateChange()" /></div>
+          <button class="dr-clear hidden" id="dash-dr-clear" onclick="clearDashDate()">×</button>
         </div>
-        <button class="btn sm" onclick="loadDashboard()">Apply →</button>
+        <button class="btn sm" onclick="applyDashDate()">Apply →</button>
       </div>
     </div>
 
-    <div class="dash-grid" id="dash-grid">
-      <div class="dash-panel dash-grid-full">
-        <div class="dash-panel-header">
+    <!-- Pairs panel -->
+    <div class="dash-panel">
+      <div class="dash-panel-header">
+        <div>
           <h3>Top 50 Product Pairs</h3>
-          <span class="panel-meta">% of all orders containing both</span>
+          <div class="panel-meta">% of all orders in date range containing both products</div>
         </div>
-        <div class="dash-panel-body" id="dash-pairs-list">
-          <div class="dash-loading">Upload data to see results</div>
+        <div class="panel-actions">
+          <button class="btn sm" id="pairs-btn" onclick="loadPairs()">Calculate →</button>
         </div>
       </div>
-      <!-- Trios panel — full width -->
-      <div class="dash-panel dash-grid-full">
-        <div class="dash-panel-header">
-          <h3>Top 50 Product Trios</h3>
-          <span class="panel-meta">% of all orders containing all three products</span>
-        </div>
-        <div class="dash-panel-body" id="dash-trios-list" style="max-height:500px;">
-          <div class="dash-empty" id="trios-placeholder">
-            <div style="margin-bottom:12px;color:var(--muted);font-size:12px;">Trio analysis is heavy on large datasets.<br>Click below when ready.</div>
-            <button class="btn sm" style="margin-top:0;" onclick="loadTrios()">Calculate Top 50 Trios →</button>
-          </div>
+      <div class="dash-panel-body" id="dash-pairs-list">
+        <div class="dash-placeholder">
+          <p>Click <strong>Calculate</strong> to find the most frequently bought-together product pairs.</p>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ══════════════════════════════════════════════
-       SEARCH PAGE
-  ══════════════════════════════════════════════ -->
+    <!-- Trios panel -->
+    <div class="dash-panel">
+      <div class="dash-panel-header">
+        <div>
+          <h3>Top 50 Product Trios</h3>
+          <div class="panel-meta">% of all orders containing all three products</div>
+        </div>
+        <div class="panel-actions">
+          <button class="btn sm" id="trios-btn" onclick="loadTrios()">Calculate →</button>
+        </div>
+      </div>
+      <div class="dash-panel-body" id="dash-trios-list">
+        <div class="dash-placeholder">
+          <p>Click <strong>Calculate</strong> to find the most frequently bought-together product trios.<br>May take a moment on large datasets.</p>
+        </div>
+      </div>
+    </div>
+  </div><!-- /dashboard -->
+
+  <!-- ══ TYPE VS TYPE PAGE ══ -->
+  <div class="page" id="page-types">
+    <div class="type-page-header">
+      <h2>Product Type vs Type</h2>
+      <p>Which product categories are most commonly bought together in the same order.</p>
+    </div>
+
+    <!-- Date filter -->
+    <div id="types-date-row" style="display:none">
+      <div class="date-range-wrap">
+        <div class="date-range-widget" id="types-date-widget">
+          <div class="dr-label">From</div>
+          <div class="dr-part"><input type="date" id="types-date-from" oninput="onTypesDateChange()" /></div>
+          <div class="dr-sep">→</div>
+          <div class="dr-part"><input type="date" id="types-date-to" oninput="onTypesDateChange()" /></div>
+          <button class="dr-clear hidden" id="types-dr-clear" onclick="clearTypesDate()">×</button>
+        </div>
+        <button class="btn sm" onclick="loadTypePairs()">Apply →</button>
+      </div>
+    </div>
+
+    <div class="dash-panel">
+      <div class="dash-panel-header">
+        <div>
+          <h3>Top 50 Type Pairs</h3>
+          <div class="panel-meta">% of all orders containing products from both types</div>
+        </div>
+        <div class="panel-actions">
+          <button class="btn sm" id="type-pairs-btn" onclick="loadTypePairs()">Calculate →</button>
+        </div>
+      </div>
+      <div class="dash-panel-body" id="type-pairs-list">
+        <div class="dash-placeholder">
+          <p>Click <strong>Calculate</strong> to see which product categories are most often bought together.</p>
+        </div>
+      </div>
+    </div>
+  </div><!-- /types -->
+
+  <!-- ══ SEARCH PAGE ══ -->
   <div class="page" id="page-search">
-
     <div class="section-label" style="margin-bottom:16px;">Search for a product to see what it's bought with</div>
 
     <div class="search-grid">
@@ -382,8 +403,7 @@
       </div>
     </div>
 
-    <!-- Date filter for search -->
-    <div id="date-filter-row-search">
+    <div class="date-filter-row" id="search-date-row">
       <div class="field" style="margin-bottom:12px;">
         <label>Date Range <span style="color:var(--muted);font-weight:normal;text-transform:none;letter-spacing:0">(optional)</span></label>
         <div class="date-range-widget" id="search-date-widget">
@@ -391,7 +411,7 @@
           <div class="dr-part"><input type="date" id="s-date-from" oninput="onSearchDateChange()" /></div>
           <div class="dr-sep">→</div>
           <div class="dr-part"><input type="date" id="s-date-to" oninput="onSearchDateChange()" /></div>
-          <button class="dr-clear hidden" id="search-dr-clear" onclick="clearSearchDate()" title="Clear">×</button>
+          <button class="dr-clear hidden" id="search-dr-clear" onclick="clearSearchDate()">×</button>
         </div>
       </div>
     </div>
@@ -401,15 +421,14 @@
       <button class="btn secondary" onclick="clearSearch()">Clear</button>
     </div>
 
-    <div id="results-section" style="margin-top:28px;">
+    <div id="results-section">
       <div class="results-header">
         <h3>Products bought with <span id="results-query"></span></h3>
         <div class="results-meta" id="results-meta"></div>
       </div>
       <div id="results-list"></div>
     </div>
-
-  </div><!-- /page-search -->
+  </div><!-- /search -->
 
 </main>
 <div class="toast" id="toast"></div>
@@ -418,10 +437,18 @@
 const API = (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1'))
   ? 'http://localhost:8000' : window.location.origin;
 
-let pendingFile = null;
 let allNames = [], allTypes = [];
 let dataMinDate = null, dataMaxDate = null;
 let dataLoaded = false;
+let pendingFile = null;
+
+// ── Theme ─────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = isDark ? '🌙 Dark mode' : '☀ Light mode';
+}
 
 // ── Tab switching ─────────────────────────────────────────────
 function switchTab(tab) {
@@ -429,7 +456,6 @@ function switchTab(tab) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('page-' + tab).classList.add('active');
-  if (tab === 'dashboard' && dataLoaded) loadDashboard();
 }
 
 // ── Date helpers ──────────────────────────────────────────────
@@ -440,125 +466,174 @@ function formatDate(iso) {
   return `${d} ${months[parseInt(m)-1]} ${y}`;
 }
 
-function onDashDateChange() {
-  const f = document.getElementById('dash-date-from').value;
-  const t = document.getElementById('dash-date-to').value;
-  const has = f || t;
-  document.getElementById('dash-date-widget').classList.toggle('active', !!has);
-  document.getElementById('dash-dr-clear').classList.toggle('hidden', !has);
-}
-function clearDashDate() {
-  document.getElementById('dash-date-from').value = '';
-  document.getElementById('dash-date-to').value = '';
-  onDashDateChange();
-  loadDashboard();
+function makeDateHandler(widgetId, clearBtnId) {
+  return function() {
+    const w = document.getElementById(widgetId);
+    const f = w.querySelector('input[type="date"]:first-of-type').value;
+    const t = w.querySelector('input[type="date"]:last-of-type').value;
+    w.classList.toggle('active', !!(f || t));
+    document.getElementById(clearBtnId).classList.toggle('hidden', !(f || t));
+  };
 }
 
-function onSearchDateChange() {
-  const f = document.getElementById('s-date-from').value;
-  const t = document.getElementById('s-date-to').value;
-  const has = f || t;
-  document.getElementById('search-date-widget').classList.toggle('active', !!has);
-  document.getElementById('search-dr-clear').classList.toggle('hidden', !has);
+function onDashDateChange()   { makeDateHandler('dash-date-widget', 'dash-dr-clear')(); }
+function onTypesDateChange()  { makeDateHandler('types-date-widget','types-dr-clear')(); }
+function onSearchDateChange() { makeDateHandler('search-date-widget','search-dr-clear')(); }
+
+function clearDashDate()   { clearDateWidget('dash-date-from','dash-date-to','dash-date-widget','dash-dr-clear'); }
+function clearTypesDate()  { clearDateWidget('types-date-from','types-date-to','types-date-widget','types-dr-clear'); }
+function clearSearchDate() { clearDateWidget('s-date-from','s-date-to','search-date-widget','search-dr-clear'); }
+
+function clearDateWidget(fromId, toId, widgetId, clearId) {
+  document.getElementById(fromId).value = '';
+  document.getElementById(toId).value   = '';
+  document.getElementById(widgetId).classList.remove('active');
+  document.getElementById(clearId).classList.add('hidden');
 }
-function clearSearchDate() {
-  document.getElementById('s-date-from').value = '';
-  document.getElementById('s-date-to').value = '';
-  onSearchDateChange();
+
+function applyDashDate() { resetPanels(); }
+
+function resetPanels() {
+  const ph = (msg) => `<div class="dash-placeholder"><p>${msg}</p></div>`;
+  document.getElementById('dash-pairs-list').innerHTML = ph('Click <strong>Calculate</strong> to find the most frequently bought-together product pairs.');
+  document.getElementById('dash-trios-list').innerHTML = ph('Click <strong>Calculate</strong> to find the most frequently bought-together product trios.<br>May take a moment on large datasets.');
+  document.getElementById('pairs-btn').textContent = 'Calculate →';
+  document.getElementById('trios-btn').textContent = 'Calculate →';
+  document.getElementById('pairs-btn').disabled = false;
+  document.getElementById('trios-btn').disabled = false;
 }
 
-// ── Dashboard ─────────────────────────────────────────────────
-async function loadDashboard() {
-  const from = document.getElementById('dash-date-from').value;
-  const to   = document.getElementById('dash-date-to').value;
+// ── Dashboard loaders ─────────────────────────────────────────
+function getDateParams(fromId, toId) {
+  const params = new URLSearchParams();
+  const f = document.getElementById(fromId).value;
+  const t = document.getElementById(toId).value;
+  if (f) params.set('date_from', f);
+  if (t) params.set('date_to',   t);
+  return params;
+}
 
-  document.getElementById('dash-pairs-list').innerHTML = '<div class="dash-loading"><span id="dash-spinner"></span> Loading…</div>';
-
-  const params = new URLSearchParams({ limit: 25 });
-  if (from) params.set('date_from', from);
-  if (to)   params.set('date_to', to);
-
+async function loadPairs() {
+  const btn = document.getElementById('pairs-btn');
+  const el  = document.getElementById('dash-pairs-list');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  el.innerHTML = '<div class="dash-loading">Calculating pairs…</div>';
+  const params = getDateParams('dash-date-from','dash-date-to');
   try {
-    const res = await fetch(`${API}/dashboard?${params}`);
-    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    const res = await fetch(`${API}/pairs?${params}`);
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail||res.statusText); }
     const data = await res.json();
-
-    // Update order count in header
-    let countLabel = data.total_orders.toLocaleString() + ' orders';
-    if (from || to) {
-      const f = from ? formatDate(from) : 'start';
-      const t = to   ? formatDate(to)   : 'present';
-      countLabel += ` · ${f} – ${t}`;
-    }
-    document.getElementById('dash-order-count').textContent = `· ${countLabel}`;
-
-    renderTopPairs(data.top_pairs);
-    // Reset trios panel to placeholder when date filter changes
-    document.getElementById('dash-trios-list').innerHTML = '<div class="dash-empty" id="trios-placeholder"><div style="margin-bottom:12px;color:var(--muted);font-size:12px;">Trio analysis is heavy on large datasets.<br>Click below when ready.</div><button class="btn sm" style="margin-top:0;" onclick="loadTrios()">Calculate Top 50 Trios →</button></div>';
+    renderPairRows(data.top_pairs, el, data.total_orders);
+    btn.textContent = '↺ Recalculate';
   } catch(err) {
-    document.getElementById('dash-products-list').innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
-    document.getElementById('dash-pairs-list').innerHTML    = `<div class="dash-empty"> </div>`;
+    el.innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
+    btn.textContent = 'Calculate →';
   }
-}
-
-function renderTopPairs(items) {
-  const el = document.getElementById('dash-pairs-list');
-  if (!items.length) { el.innerHTML = '<div class="dash-empty">No pairs found — most orders contain a single item</div>'; return; }
-  const max = items[0].pct;
-  el.innerHTML = items.map((p, i) => `
-    <div class="pair-row">
-      <div class="pair-top">
-        <div class="pair-rank">${i+1}</div>
-        <div class="pair-names">
-          <div class="pair-a" title="${esc(p.product_a.name)}">${esc(p.product_a.name)}</div>
-          <div class="pair-plus">+</div>
-          <div class="pair-b" title="${esc(p.product_b.name)}">${esc(p.product_b.name)}</div>
-        </div>
-        <div class="pair-right">
-          <div class="pair-pct">${p.pct}%</div>
-          <div class="pair-count">${p.count.toLocaleString()} orders</div>
-        </div>
-      </div>
-      <div class="pair-bar-wrap"><div class="pair-bar-fill" style="width:${Math.round(p.pct/max*100)}%"></div></div>
-    </div>`).join('');
+  btn.disabled = false;
 }
 
 async function loadTrios() {
-  const el = document.getElementById('dash-trios-list');
-  el.innerHTML = '<div class="dash-loading">Calculating trios… this may take a moment on large datasets</div>';
-  const from = document.getElementById('dash-date-from').value;
-  const to   = document.getElementById('dash-date-to').value;
-  const params = new URLSearchParams();
-  if (from) params.set('date_from', from);
-  if (to)   params.set('date_to', to);
+  const btn = document.getElementById('trios-btn');
+  const el  = document.getElementById('dash-trios-list');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  el.innerHTML = '<div class="dash-loading">Calculating trios… may take a moment on large datasets</div>';
+  const params = getDateParams('dash-date-from','dash-date-to');
   try {
     const res = await fetch(`${API}/trios?${params}`);
-    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail||res.statusText); }
     const data = await res.json();
-    const items = data.top_trios || [];
-    if (!items.length) { el.innerHTML = '<div class="dash-empty">No three-product combinations found — not enough orders with 3+ items</div>'; return; }
-    const max = items[0].pct;
-    el.innerHTML = items.map((t, i) => `
-      <div class="trio-row">
-        <div class="trio-top">
-          <div class="trio-rank">${i+1}</div>
-          <div class="trio-names">
-            <div class="trio-product" title="${esc(t.product_a.name)}">${esc(t.product_a.name)}</div>
-            <div class="trio-sep">+</div>
-            <div class="trio-product" title="${esc(t.product_b.name)}">${esc(t.product_b.name)}</div>
-            <div class="trio-sep">+</div>
-            <div class="trio-product" title="${esc(t.product_c.name)}">${esc(t.product_c.name)}</div>
-          </div>
-          <div class="trio-right">
-            <div class="trio-pct">${t.pct}%</div>
-            <div class="trio-count">${t.count.toLocaleString()} orders</div>
-          </div>
-        </div>
-        <div class="trio-bar-wrap"><div class="trio-bar-fill" style="width:${Math.round(t.pct/max*100)}%"></div></div>
-      </div>`).join('');
+    renderTrioRows(data.top_trios, el, data.total_orders);
+    btn.textContent = '↺ Recalculate';
   } catch(err) {
     el.innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
+    btn.textContent = 'Calculate →';
   }
+  btn.disabled = false;
+}
+
+async function loadTypePairs() {
+  const btn = document.getElementById('type-pairs-btn');
+  const el  = document.getElementById('type-pairs-list');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  el.innerHTML = '<div class="dash-loading">Calculating type pairs…</div>';
+  const params = getDateParams('types-date-from','types-date-to');
+  try {
+    const res = await fetch(`${API}/type-pairs?${params}`);
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail||res.statusText); }
+    const data = await res.json();
+    renderTypePairRows(data.top_type_pairs, el, data.total_orders);
+    btn.textContent = '↺ Recalculate';
+  } catch(err) {
+    el.innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
+    btn.textContent = 'Calculate →';
+  }
+  btn.disabled = false;
+}
+
+// ── Row renderers ─────────────────────────────────────────────
+function renderPairRows(items, el, total) {
+  if (!items || !items.length) { el.innerHTML = '<div class="dash-empty">No pairs found — most orders contain a single item.</div>'; return; }
+  const max = items[0].pct;
+  el.innerHTML = items.map((p,i) => `
+    <div class="pair-row">
+      <div class="row-top">
+        <div class="row-rank">${i+1}</div>
+        <div class="row-names">
+          <div class="row-product" title="${esc(p.product_a.name)}">${esc(p.product_a.name)}</div>
+          <div class="row-sep">+</div>
+          <div class="row-product" title="${esc(p.product_b.name)}">${esc(p.product_b.name)}</div>
+        </div>
+        <div class="row-right">
+          <div class="row-pct">${p.pct}%</div>
+          <div class="row-count">${p.count.toLocaleString()} orders</div>
+        </div>
+      </div>
+      <div class="row-bar-wrap"><div class="row-bar-fill" style="width:${Math.round(p.pct/max*100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderTrioRows(items, el, total) {
+  if (!items || !items.length) { el.innerHTML = '<div class="dash-empty">No three-product combinations found — not enough orders with 3+ items.</div>'; return; }
+  const max = items[0].pct;
+  el.innerHTML = items.map((t,i) => `
+    <div class="trio-row">
+      <div class="row-top">
+        <div class="row-rank">${i+1}</div>
+        <div class="row-names">
+          <div class="row-product" title="${esc(t.product_a.name)}">${esc(t.product_a.name)}</div>
+          <div class="row-sep">+</div>
+          <div class="row-product" title="${esc(t.product_b.name)}">${esc(t.product_b.name)}</div>
+          <div class="row-sep">+</div>
+          <div class="row-product" title="${esc(t.product_c.name)}">${esc(t.product_c.name)}</div>
+        </div>
+        <div class="row-right">
+          <div class="row-pct">${t.pct}%</div>
+          <div class="row-count">${t.count.toLocaleString()} orders</div>
+        </div>
+      </div>
+      <div class="row-bar-wrap"><div class="row-bar-fill" style="width:${Math.round(t.pct/max*100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderTypePairRows(items, el, total) {
+  if (!items || !items.length) { el.innerHTML = '<div class="dash-empty">No type pairs found — your data may not have product types set.</div>'; return; }
+  const max = items[0].pct;
+  el.innerHTML = items.map((p,i) => `
+    <div class="type-pair-row">
+      <div class="row-top">
+        <div class="row-rank">${i+1}</div>
+        <div class="row-names">
+          <div class="row-type" title="${esc(p.type_a)}">${esc(p.type_a)}</div>
+          <div class="row-sep">+</div>
+          <div class="row-type" title="${esc(p.type_b)}">${esc(p.type_b)}</div>
+        </div>
+        <div class="row-right">
+          <div class="row-pct">${p.pct}%</div>
+          <div class="row-count">${p.count.toLocaleString()} orders</div>
+        </div>
+      </div>
+      <div class="row-bar-wrap"><div class="row-bar-fill" style="width:${Math.round(p.pct/max*100)}%"></div></div>
+    </div>`).join('');
 }
 
 // ── Combo boxes ───────────────────────────────────────────────
@@ -572,7 +647,7 @@ function initCombo(key, items) {
     const fl = (filter||'').toLowerCase();
     const matches = fl ? items.filter(i=>i.toLowerCase().includes(fl)).slice(0,150) : items.slice(0,150);
     dropdown.innerHTML = matches.length
-      ? matches.map((m,i)=>`<div class="combo-option" data-val="${esc(m)}" data-idx="${i}">${esc(m)}</div>`).join('')
+      ? matches.map((m,i)=>`<div class="combo-option" data-val="${esc(m)}">${esc(m)}</div>`).join('')
       : `<div class="combo-option no-results">No matches</div>`;
     hi = -1;
     dropdown.querySelectorAll('.combo-option:not(.no-results)').forEach(el=>{
@@ -649,7 +724,7 @@ async function submitWithMapping(){
     showProgress(true,'Done!',100);
     document.getElementById('mapper-section').classList.remove('visible');
     setTimeout(()=>{showProgress(false);applyStats(data);},600);
-  } catch(err){showProgress(false);showToast('Failed: '+err.message,'error');}
+  }catch(err){showProgress(false);showToast('Failed: '+err.message,'error');}
 }
 
 function applyStats(data) {
@@ -664,18 +739,18 @@ function applyStats(data) {
   if (data.has_dates && data.min_date && data.max_date) {
     document.getElementById('stat-date-box').style.display = 'block';
     document.getElementById('stat-date-range').textContent = `${formatDate(data.min_date)} –\n${formatDate(data.max_date)}`;
-
-    // Set constraints, leave blank by default
-    ['dash-date-from','dash-date-to','s-date-from','s-date-to'].forEach(id=>{
+    ['dash-date-from','dash-date-to','types-date-from','types-date-to','s-date-from','s-date-to'].forEach(id=>{
       const el=document.getElementById(id);
       el.min=data.min_date; el.max=data.max_date; el.value='';
     });
-    document.getElementById('date-filter-row-dash').style.display='block';
-    document.getElementById('date-filter-row-search').style.display='block';
+    document.getElementById('dash-date-row').style.display  = 'block';
+    document.getElementById('types-date-row').style.display = 'block';
+    document.getElementById('search-date-row').classList.add('visible');
   } else {
     document.getElementById('stat-date-box').style.display='none';
-    document.getElementById('date-filter-row-dash').style.display='none';
-    document.getElementById('date-filter-row-search').style.display='none';
+    document.getElementById('dash-date-row').style.display='none';
+    document.getElementById('types-date-row').style.display='none';
+    document.getElementById('search-date-row').classList.remove('visible');
   }
 
   allNames=data.names||[]; allTypes=data.types||[];
@@ -687,9 +762,7 @@ function applyStats(data) {
   document.getElementById('status-pill').classList.add('loaded');
   document.getElementById('status-text').textContent=`${(data.order_count||0).toLocaleString()} orders loaded`;
   dataLoaded=true;
-
   showToast(`✓ Loaded ${(data.order_count||0).toLocaleString()} orders`,'success');
-  loadDashboard();
 }
 
 // ── Search ────────────────────────────────────────────────────
@@ -714,7 +787,7 @@ async function runSearch(){
     let dateLabel='';
     if(dateFrom||dateTo){const f=dateFrom?formatDate(dateFrom):'start';const t=dateTo?formatDate(dateTo):'present';dateLabel=` · ${f} – ${t}`;}
     showResults(data.results,name||sku||pid||type,data.match_count,dateLabel);
-  } catch(err){showToast('Search failed: '+err.message,'error');}
+  }catch(err){showToast('Search failed: '+err.message,'error');}
   finally{setSearchLoading(false);}
 }
 
@@ -757,6 +830,7 @@ function clearData(){
   document.getElementById('status-text').textContent='No data loaded';
   document.getElementById('stat-date-box').style.display='none';
   switchTab('dashboard');
+  resetPanels();
   clearSearch();
 }
 
@@ -771,7 +845,7 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 let toastTimer;
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3500);}
 
-// ── On load: restore data if server has it ────────────────────
+// ── On load: restore if server has data ───────────────────────
 (async()=>{
   try{const res=await fetch(`${API}/stats`);if(res.ok){const data=await res.json();applyStats(data);}}catch(e){}
 })();
