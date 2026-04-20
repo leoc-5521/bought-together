@@ -215,12 +215,24 @@ def get_stats():
         raise HTTPException(status_code=404, detail="No data loaded")
     return stats
 
-# ── Dashboard endpoint ───────────────────────────────────────────
+# ── Dashboard endpoint (just returns order count for the date range) ─
 @app.get("/dashboard")
 def dashboard(
     date_from: Optional[str] = Query(None),
     date_to:   Optional[str] = Query(None),
-    limit:     int           = Query(50),
+):
+    if not orders_map:
+        raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
+    df = parse_date(date_from) if date_from else None
+    dt = parse_date(date_to)   if date_to   else None
+    total_orders = sum(1 for o in orders_map.values() if in_date_range(o, df, dt))
+    return {"total_orders": total_orders}
+
+# ── Pairs endpoint (on-demand) ───────────────────────────────────
+@app.get("/pairs")
+def pairs(
+    date_from: Optional[str] = Query(None),
+    date_to:   Optional[str] = Query(None),
 ):
     if not orders_map:
         raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
@@ -228,37 +240,63 @@ def dashboard(
     df = parse_date(date_from) if date_from else None
     dt = parse_date(date_to)   if date_to   else None
 
-    filtered_orders = [o for o in orders_map.values() if in_date_range(o, df, dt)]
-    total_orders = len(filtered_orders)
-    if total_orders == 0:
-        return {"total_orders": 0, "top_products": [], "top_pairs": []}
+    # Use integer IDs to keep memory low (same approach as trios)
+    key_to_id: dict[str, int] = {}
+    id_to_key: list[str] = []
 
-    # ── Top pairs
+    def get_id(key: str) -> int:
+        if key not in key_to_id:
+            key_to_id[key] = len(id_to_key)
+            id_to_key.append(key)
+        return key_to_id[key]
+
     pair_count: dict[tuple, int] = defaultdict(int)
-    pair_data:  dict[tuple, dict] = {}
+    total_orders = 0
 
-    for order in filtered_orders:
+    for order in orders_map.values():
+        if not in_date_range(order, df, dt):
+            continue
+        total_orders += 1
         prods = order["products"]
         if len(prods) < 2:
             continue
-        keys = sorted({p["_key"] for p in prods})
-        prod_lookup = {p["_key"]: p for p in prods}
-        for ka, kb in combinations(keys, 2):
-            pair = (ka, kb)
+        ids = sorted({get_id(p["_key"]) for p in prods})
+        for pair in combinations(ids, 2):
             pair_count[pair] += 1
-            if pair not in pair_data:
-                pa, pb = prod_lookup[ka], prod_lookup[kb]
-                pair_data[pair] = {
-                    "product_a": {"name": pa["name"], "sku": get_p(pa,"sku"), "id": get_p(pa,"id"), "type": get_p(pa,"type")},
-                    "product_b": {"name": pb["name"], "sku": get_p(pb,"sku"), "id": get_p(pb,"id"), "type": get_p(pb,"type")},
-                }
 
-    top_pairs = sorted(
-        [{"product_a": pair_data[p]["product_a"], "product_b": pair_data[p]["product_b"],
-          "count": c, "pct": round(c / total_orders * 100, 1)}
-         for p, c in pair_count.items()],
-        key=lambda x: (-x["pct"], -x["count"])
-    )[:limit]
+    if total_orders == 0:
+        return {"total_orders": 0, "top_pairs": []}
+
+    top_raw = sorted(pair_count.items(), key=lambda x: -x[1])[:50]
+    del pair_count
+    gc.collect()
+
+    needed_keys = set()
+    for (ia, ib), _ in top_raw:
+        needed_keys.update([id_to_key[ia], id_to_key[ib]])
+
+    prod_info: dict[str, dict] = {}
+    for order in orders_map.values():
+        for p in order["products"]:
+            k = p["_key"]
+            if k in needed_keys and k not in prod_info:
+                prod_info[k] = {"name": p["name"], "sku": get_p(p,"sku"),
+                                "id": get_p(p,"id"), "type": get_p(p,"type")}
+        if len(prod_info) == len(needed_keys):
+            break
+
+    top_pairs = []
+    for (ia, ib), cnt in top_raw:
+        ka, kb = id_to_key[ia], id_to_key[ib]
+        top_pairs.append({
+            "product_a": prod_info.get(ka, {"name": ka, "sku": "", "id": "", "type": ""}),
+            "product_b": prod_info.get(kb, {"name": kb, "sku": "", "id": "", "type": ""}),
+            "count": cnt,
+            "pct": round(cnt / total_orders * 100, 1),
+        })
+
+    del top_raw, prod_info, key_to_id, id_to_key
+    gc.collect()
 
     return {"total_orders": total_orders, "top_pairs": top_pairs}
 
@@ -342,6 +380,47 @@ def trios(
     gc.collect()
 
     return {"total_orders": total_orders, "top_trios": top_trios}
+
+# ── Type vs Type endpoint ────────────────────────────────────────
+@app.get("/type-pairs")
+def type_pairs(
+    date_from: Optional[str] = Query(None),
+    date_to:   Optional[str] = Query(None),
+):
+    if not orders_map:
+        raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
+
+    df = parse_date(date_from) if date_from else None
+    dt = parse_date(date_to)   if date_to   else None
+
+    type_pair_count: dict[tuple, int] = defaultdict(int)
+    total_orders = 0
+
+    for order in orders_map.values():
+        if not in_date_range(order, df, dt):
+            continue
+        total_orders += 1
+        prods = order["products"]
+        # Get unique non-empty types in this order
+        types = sorted({get_p(p, "type") for p in prods if get_p(p, "type")})
+        if len(types) < 2:
+            continue
+        for ta, tb in combinations(types, 2):
+            type_pair_count[(ta, tb)] += 1
+
+    if total_orders == 0:
+        return {"total_orders": 0, "top_type_pairs": []}
+
+    top_type_pairs = sorted(
+        [{"type_a": ta, "type_b": tb, "count": c, "pct": round(c / total_orders * 100, 1)}
+         for (ta, tb), c in type_pair_count.items()],
+        key=lambda x: (-x["pct"], -x["count"])
+    )[:50]
+
+    del type_pair_count
+    gc.collect()
+
+    return {"total_orders": total_orders, "top_type_pairs": top_type_pairs}
 
 # ── Search endpoint ──────────────────────────────────────────────
 @app.get("/search")
