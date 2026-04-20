@@ -229,7 +229,6 @@
 
 <div class="tab-bar" id="tab-bar">
   <div class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
-  <div class="tab" id="tab-types" onclick="switchTab('types')">🏷 Type vs Type</div>
   <div class="tab" id="tab-search" onclick="switchTab('search')">🔍 Search</div>
 </div>
 
@@ -329,46 +328,33 @@
         </div>
       </div>
     </div>
-  </div><!-- /dashboard -->
 
-  <!-- ══ TYPE VS TYPE PAGE ══ -->
-  <div class="page" id="page-types">
-    <div class="type-page-header">
-      <h2>Product Type vs Type</h2>
-      <p>Which product categories are most commonly bought together in the same order.</p>
-    </div>
-
-    <!-- Date filter -->
-    <div id="types-date-row" style="display:none">
-      <div class="date-range-wrap">
-        <div class="date-range-widget" id="types-date-widget">
-          <div class="dr-label">From</div>
-          <div class="dr-part"><input type="date" id="types-date-from" oninput="onTypesDateChange()" /></div>
-          <div class="dr-sep">→</div>
-          <div class="dr-part"><input type="date" id="types-date-to" oninput="onTypesDateChange()" /></div>
-          <button class="dr-clear hidden" id="types-dr-clear" onclick="clearTypesDate()">×</button>
-        </div>
-        <button class="btn sm" onclick="loadTypePairs()">Apply →</button>
-      </div>
-    </div>
-
+    <!-- Type vs Type panel -->
     <div class="dash-panel">
       <div class="dash-panel-header">
         <div>
-          <h3>Top 50 Type Pairs</h3>
-          <div class="panel-meta">% of all orders containing products from both types</div>
+          <h3>Type vs Type</h3>
+          <div class="panel-meta">Which product categories are most often bought together</div>
         </div>
-        <div class="panel-actions">
+        <div class="panel-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="combo-wrap" style="min-width:220px;">
+            <input type="text" class="combo-input" id="combo-tvt-input" placeholder="Filter by type (optional)…" autocomplete="off" style="font-size:12px;padding:7px 34px 7px 12px;" />
+            <button class="combo-clear" id="combo-tvt-clear" onclick="clearCombo('tvt')" tabindex="-1">×</button>
+            <span class="combo-arrow">▾</span>
+            <div class="combo-dropdown" id="combo-tvt-dropdown"></div>
+          </div>
           <button class="btn sm" id="type-pairs-btn" onclick="loadTypePairs()">Calculate →</button>
         </div>
       </div>
       <div class="dash-panel-body" id="type-pairs-list">
         <div class="dash-placeholder">
-          <p>Click <strong>Calculate</strong> to see which product categories are most often bought together.</p>
+          <p>Optionally select a product type to filter by, then click <strong>Calculate</strong>.<br>Leave blank to see all type combinations.</p>
         </div>
       </div>
     </div>
-  </div><!-- /types -->
+  </div><!-- /dashboard -->
+
+
 
   <!-- ══ SEARCH PAGE ══ -->
   <div class="page" id="page-search">
@@ -477,11 +463,9 @@ function makeDateHandler(widgetId, clearBtnId) {
 }
 
 function onDashDateChange()   { makeDateHandler('dash-date-widget', 'dash-dr-clear')(); }
-function onTypesDateChange()  { makeDateHandler('types-date-widget','types-dr-clear')(); }
 function onSearchDateChange() { makeDateHandler('search-date-widget','search-dr-clear')(); }
 
 function clearDashDate()   { clearDateWidget('dash-date-from','dash-date-to','dash-date-widget','dash-dr-clear'); }
-function clearTypesDate()  { clearDateWidget('types-date-from','types-date-to','types-date-widget','types-dr-clear'); }
 function clearSearchDate() { clearDateWidget('s-date-from','s-date-to','search-date-widget','search-dr-clear'); }
 
 function clearDateWidget(fromId, toId, widgetId, clearId) {
@@ -501,6 +485,9 @@ function resetPanels() {
   document.getElementById('trios-btn').textContent = 'Calculate →';
   document.getElementById('pairs-btn').disabled = false;
   document.getElementById('trios-btn').disabled = false;
+  document.getElementById('type-pairs-list').innerHTML = ph('Optionally select a product type to filter by, then click <strong>Calculate</strong>.<br>Leave blank to see all type combinations.');
+  document.getElementById('type-pairs-btn').textContent = 'Calculate →';
+  document.getElementById('type-pairs-btn').disabled = false;
 }
 
 // ── Dashboard loaders ─────────────────────────────────────────
@@ -556,12 +543,14 @@ async function loadTypePairs() {
   const el  = document.getElementById('type-pairs-list');
   btn.disabled = true; btn.textContent = 'Loading…';
   el.innerHTML = '<div class="dash-loading">Calculating type pairs…</div>';
-  const params = getDateParams('types-date-from','types-date-to');
+  const params = getDateParams('dash-date-from','dash-date-to');
+  const filterType = document.getElementById('combo-tvt-input').value.trim();
+  if (filterType) params.set('filter_type', filterType);
   try {
     const res = await fetch(`${API}/type-pairs?${params}`);
     if (!res.ok) { const e=await res.json(); throw new Error(e.detail||res.statusText); }
     const data = await res.json();
-    renderTypePairRows(data.top_type_pairs, el, data.total_orders);
+    renderTypePairRows(data.top_type_pairs, el, data.matching_orders, filterType);
     btn.textContent = '↺ Recalculate';
   } catch(err) {
     el.innerHTML = `<div class="dash-empty">Error: ${esc(err.message)}</div>`;
@@ -615,10 +604,18 @@ function renderTrioRows(items, el, total) {
     </div>`).join('');
 }
 
-function renderTypePairRows(items, el, total) {
-  if (!items || !items.length) { el.innerHTML = '<div class="dash-empty">No type pairs found — your data may not have product types set.</div>'; return; }
+function renderTypePairRows(items, el, matchingOrders, filterType='') {
+  if (!items || !items.length) {
+    el.innerHTML = filterType
+      ? `<div class="dash-empty">No type pairs found for "<strong>${esc(filterType)}</strong>" — it may always be bought alone, or type data may be missing.</div>`
+      : '<div class="dash-empty">No type pairs found — your data may not have product types set.</div>';
+    return;
+  }
   const max = items[0].pct;
-  el.innerHTML = items.map((p,i) => `
+  const metaLine = filterType
+    ? `<div style="padding:10px 20px 4px;font-size:11px;color:var(--muted);">Showing types bought alongside <strong style="color:var(--text)">${esc(filterType)}</strong> · based on ${matchingOrders.toLocaleString()} orders</div>`
+    : `<div style="padding:10px 20px 4px;font-size:11px;color:var(--muted);">Based on ${matchingOrders.toLocaleString()} multi-type orders</div>`;
+  el.innerHTML = metaLine + items.map((p,i) => `
     <div class="type-pair-row">
       <div class="row-top">
         <div class="row-rank">${i+1}</div>
@@ -739,22 +736,20 @@ function applyStats(data) {
   if (data.has_dates && data.min_date && data.max_date) {
     document.getElementById('stat-date-box').style.display = 'block';
     document.getElementById('stat-date-range').textContent = `${formatDate(data.min_date)} –\n${formatDate(data.max_date)}`;
-    ['dash-date-from','dash-date-to','types-date-from','types-date-to','s-date-from','s-date-to'].forEach(id=>{
+    ['dash-date-from','dash-date-to','s-date-from','s-date-to'].forEach(id=>{
       const el=document.getElementById(id);
       el.min=data.min_date; el.max=data.max_date; el.value='';
     });
     document.getElementById('dash-date-row').style.display  = 'block';
-    document.getElementById('types-date-row').style.display = 'block';
     document.getElementById('search-date-row').classList.add('visible');
   } else {
     document.getElementById('stat-date-box').style.display='none';
     document.getElementById('dash-date-row').style.display='none';
-    document.getElementById('types-date-row').style.display='none';
     document.getElementById('search-date-row').classList.remove('visible');
   }
 
   allNames=data.names||[]; allTypes=data.types||[];
-  initCombo('name',allNames); initCombo('type',allTypes);
+  initCombo('name',allNames); initCombo('type',allTypes); initCombo('tvt',allTypes);
 
   document.getElementById('stats-bar').classList.add('visible');
   document.getElementById('upload-page').style.display='none';
@@ -831,6 +826,8 @@ function clearData(){
   document.getElementById('stat-date-box').style.display='none';
   switchTab('dashboard');
   resetPanels();
+  document.getElementById('combo-tvt-input').value='';
+  document.getElementById('combo-tvt-clear').classList.remove('visible');
   clearSearch();
 }
 
