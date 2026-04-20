@@ -210,8 +210,8 @@
   .toast.show { opacity:1; transform:translateY(0); }
   .toast.error { border-color:var(--danger); color:var(--danger); }
   .toast.success { border-color:var(--accent); color:var(--accent); }
-  #spinner, #cs-spinner { display:none; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
-  #spinner.visible, #cs-spinner.visible { display:inline-block; }
+  #spinner, #cs-spinner, #pt-spinner { display:none; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  #spinner.visible, #cs-spinner.visible, #pt-spinner.visible { display:inline-block; }
   @keyframes spin { to{transform:rotate(360deg)} }
 </style>
 </head>
@@ -230,8 +230,8 @@
 
 <div class="tab-bar" id="tab-bar">
   <div class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
-  <div class="tab" id="tab-crosssell" onclick="switchTab('crosssell')">💡 Cross-sell</div>
   <div class="tab" id="tab-search" onclick="switchTab('search')">🔍 Search</div>
+  <div class="tab" id="tab-crosssell" onclick="switchTab('crosssell')">💡 Cross-sell</div>
 </div>
 
 <main>
@@ -354,6 +354,43 @@
         </div>
       </div>
     </div>
+    <!-- Product Trios by Product panel -->
+    <div class="dash-panel">
+      <div class="dash-panel-header">
+        <div>
+          <h3>Product Trios by Product</h3>
+          <div class="panel-meta">All trios containing a selected product, sorted by frequency</div>
+        </div>
+      </div>
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
+        <div class="search-grid" style="margin-bottom:10px;">
+          <div class="field">
+            <label>Product Name</label>
+            <div class="combo-wrap">
+              <input type="text" class="combo-input" id="combo-pt-name-input" placeholder="Type to search products..." autocomplete="off" />
+              <button class="combo-clear" id="combo-pt-name-clear" onclick="clearCombo('pt-name')" tabindex="-1">&times;</button>
+              <span class="combo-arrow">&#9660;</span>
+              <div class="combo-dropdown" id="combo-pt-name-dropdown"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Variant SKU</label>
+            <input type="text" id="pt-sku" placeholder="e.g. SHOE-BLU-42" />
+          </div>
+        </div>
+        <div class="search-actions">
+          <button class="btn sm" onclick="runProductTrios()" id="pt-btn" style="margin-top:0;"><span id="pt-spinner"></span>Find Trios</button>
+          <button class="btn sm secondary" onclick="clearProductTrios()" style="margin-top:0;">Clear</button>
+        </div>
+        <div id="pt-results-meta" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
+      </div>
+      <div class="dash-panel-body" id="pt-results-list" style="max-height:560px;">
+        <div class="dash-placeholder">
+          <p>Select a product above and click <strong>Find Trios</strong> to see every trio it appears in.</p>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /dashboard -->
 
 
@@ -811,7 +848,7 @@ function applyStats(data) {
   }
 
   allNames=data.names||[]; allTypes=data.types||[];
-  initCombo('name',allNames); initCombo('type',allTypes); initCombo('tvt',allTypes); initCombo('cs-name',allNames);
+  initCombo('name',allNames); initCombo('type',allTypes); initCombo('tvt',allTypes); initCombo('cs-name',allNames); initCombo('pt-name',allNames);
 
   document.getElementById('stats-bar').classList.add('visible');
   document.getElementById('upload-page').style.display='none';
@@ -996,6 +1033,80 @@ function clearCrosssell() {
   ['cs-sku', 'cs-id'].forEach(function(id) { document.getElementById(id).value = ''; });
   clearCsDate();
   document.getElementById('cs-results-section').style.display = 'none';
+}
+
+// ── Product Trios ─────────────────────────────────────────────
+function onPtDateChange() { makeDateHandler('pt-date-widget','pt-dr-clear')(); }
+function clearPtDate() { clearDateWidget('pt-date-from','pt-date-to','pt-date-widget','pt-dr-clear'); }
+
+async function runProductTrios() {
+  var name     = document.getElementById('combo-pt-name-input').value.trim();
+  var sku      = document.getElementById('pt-sku').value.trim();
+  if (!name && !sku) { showToast('Select a product first', 'error'); return; }
+  document.getElementById('pt-spinner').classList.add('visible');
+  document.getElementById('pt-btn').disabled = true;
+  var params = new URLSearchParams();
+  if (name)     params.set('name', name);
+  if (sku)      params.set('sku',  sku);
+  var dashFrom = document.getElementById('dash-date-from').value;
+  var dashTo   = document.getElementById('dash-date-to').value;
+  if (dashFrom) params.set('date_from', dashFrom);
+  if (dashTo)   params.set('date_to',   dashTo);
+  try {
+    var res = await fetch(API + '/product-trios?' + params);
+    if (!res.ok) { var e = await res.json(); throw new Error(e.detail || res.statusText); }
+    var data = await res.json();
+    var query = name || sku;
+    document.getElementById('pt-results-query').textContent = '"' + query + '"';
+    var dashFrom = document.getElementById('dash-date-from').value;
+    var dashTo   = document.getElementById('dash-date-to').value;
+    var dateLabel = '';
+    if (dashFrom || dashTo) {
+      var f = dashFrom ? formatDate(dashFrom) : 'start';
+      var t = dashTo   ? formatDate(dashTo)   : 'present';
+      dateLabel = ' · ' + f + ' to ' + t;
+    }
+    document.getElementById('pt-results-meta').textContent =
+      'Product found in ' + (data.anchor_orders || 0).toLocaleString() + ' orders with 3+ items' +
+      dateLabel + ' · ' + (data.trios ? data.trios.length : 0).toLocaleString() + ' trios found';
+    var list = document.getElementById('pt-results-list');
+    if (!data.trios || !data.trios.length) {
+      list.innerHTML = '<div class="dash-empty">No trios found — this product may not appear in any orders with 3+ items.</div>';
+    } else {
+      var maxCount = data.trios[0].count;
+      list.innerHTML = data.trios.map(function(t, i) {
+        return '<div class="product-card">' +
+          '<div>' +
+            '<div class="pc-rank">#' + (i+1) + '</div>' +
+            '<div style="display:flex;flex-direction:column;gap:2px;">' +
+              '<div class="pc-name">' + esc(t.product_a.name) + '</div>' +
+              '<div style="font-size:11px;color:var(--muted);padding:1px 0;">+</div>' +
+              '<div class="pc-name">' + esc(t.product_b.name) + '</div>' +
+              '<div style="font-size:11px;color:var(--muted);padding:1px 0;">+</div>' +
+              '<div class="pc-name">' + esc(t.product_c.name) + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="pc-right">' +
+            '<div class="pc-pct" style="font-size:26px;">' + t.count.toLocaleString() + '</div>' +
+            '<div class="pc-count">' + t.pct + '% of all orders</div>' +
+          '</div>' +
+          '<div class="bar-wrap"><div class="bar-fill" style="width:' + Math.round(t.count / maxCount * 100) + '%"></div></div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch(err) {
+    showToast('Search failed: ' + err.message, 'error');
+  } finally {
+    document.getElementById('pt-spinner').classList.remove('visible');
+    document.getElementById('pt-btn').disabled = false;
+  }
+}
+
+function clearProductTrios() {
+  clearCombo('pt-name');
+  document.getElementById('pt-sku').value = '';
+  document.getElementById('pt-results-meta').textContent = '';
+  document.getElementById('pt-results-list').innerHTML = '<div class="dash-placeholder"><p>Select a product above and click <strong>Find Trios</strong> to see every trio it appears in.</p></div>';
 }
 
 // ── On load: restore if server has data ───────────────────────
