@@ -642,6 +642,93 @@ def crosssell(
         "results": results,
     }
 
+# ── Product Trios endpoint (filtered by product) ─────────────────
+# Find all trios containing a specific product, sorted by frequency.
+@app.get("/product-trios")
+def product_trios(
+    name:      Optional[str] = Query(None),
+    sku:       Optional[str] = Query(None),
+    pid:       Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to:   Optional[str] = Query(None),
+):
+    if not orders_map:
+        raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
+
+    nl = (name or "").lower()
+    sl = (sku  or "").lower()
+    il = (pid  or "").lower()
+    if not any([nl, sl, il]):
+        raise HTTPException(status_code=400, detail="Provide at least one search term")
+
+    df = parse_date(date_from) if date_from else None
+    dt = parse_date(date_to)   if date_to   else None
+
+    def is_anchor(p):
+        return ((nl and nl in p["name"].lower()) or
+                (sl and sl in get_p(p, "sku").lower()) or
+                (il and il in get_p(p, "id").lower()))
+
+    # Count trios that include the anchor product
+    trio_count: dict[tuple, int] = defaultdict(int)
+    # Store product info keyed by _key for lookup
+    prod_info: dict[str, dict] = {}
+    total_orders = 0
+    anchor_orders = 0  # orders containing the anchor product
+
+    for order in orders_map.values():
+        if not in_date_range(order, df, dt):
+            continue
+        total_orders += 1
+        prods = order["products"]
+
+        # Cache product info as we go
+        for p in prods:
+            k = p["_key"]
+            if k not in prod_info:
+                prod_info[k] = {"name": p["name"], "sku": get_p(p,"sku"),
+                                "id": get_p(p,"id"), "type": get_p(p,"type")}
+
+        if len(prods) < 3:
+            continue
+
+        # Find anchor keys in this order
+        anchor_keys = {p["_key"] for p in prods if is_anchor(p)}
+        if not anchor_keys:
+            continue
+
+        anchor_orders += 1
+        all_keys = sorted({p["_key"] for p in prods})
+
+        # Only count trios that include at least one anchor key
+        for trio in combinations(all_keys, 3):
+            if any(ak in trio for ak in anchor_keys):
+                trio_count[trio] += 1
+
+    if anchor_orders == 0:
+        return {"total_orders": total_orders, "anchor_orders": 0, "trios": []}
+
+    # Sort all trios by count descending — no limit
+    trios_result = []
+    for trio, cnt in sorted(trio_count.items(), key=lambda x: -x[1]):
+        ka, kb, kc = trio
+        trios_result.append({
+            "product_a": prod_info.get(ka, {"name": ka, "sku": "", "id": "", "type": ""}),
+            "product_b": prod_info.get(kb, {"name": kb, "sku": "", "id": "", "type": ""}),
+            "product_c": prod_info.get(kc, {"name": kc, "sku": "", "id": "", "type": ""}),
+            "count": cnt,
+            "pct": round(cnt / total_orders * 100, 2),
+        })
+
+    del trio_count, prod_info
+    gc.collect()
+
+    return {
+        "total_orders": total_orders,
+        "anchor_orders": anchor_orders,
+        "trios": trios_result,
+    }
+
 # ── Serve frontend ───────────────────────────────────────────────
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
