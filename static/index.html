@@ -69,6 +69,7 @@
   .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn.secondary:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
   .btn.sm { padding: 7px 14px; font-size: 11px; margin-top: 0; }
+  .btn.active-sort { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   #progress-bar-wrap { display: none; margin-top: 20px; }
   #progress-bar-wrap.visible { display: block; }
@@ -397,9 +398,14 @@
         </div>
       </div>
     </div>
-    <div class="search-actions">
+    <div class="search-actions" style="margin-bottom:10px;">
       <button class="btn" onclick="runCrosssell()" id="cs-btn"><span id="cs-spinner"></span>Find Cross-sell Opportunities</button>
       <button class="btn secondary" onclick="clearCrosssell()">Clear</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);">Sort by:</span>
+      <button class="btn sm active-sort" id="sort-cocount-btn" onclick="setCsSort('co_count')" style="margin-top:0;">Co-purchase Count</button>
+      <button class="btn sm secondary" id="sort-revenue-btn" onclick="setCsSort('revenue')" style="margin-top:0;">Primary Revenue</button>
     </div>
     <div id="cs-results-section" style="display:none;margin-top:28px;">
       <div class="results-header">
@@ -902,6 +908,18 @@ function showToast(msg,type=''){const t=document.getElementById('toast');t.textC
 function onCsDateChange() { makeDateHandler('cs-date-widget','cs-dr-clear')(); }
 function clearCsDate() { clearDateWidget('cs-date-from','cs-date-to','cs-date-widget','cs-dr-clear'); }
 
+var csSortBy = 'co_count';
+
+function setCsSort(mode) {
+  csSortBy = mode;
+  document.getElementById('sort-cocount-btn').className = mode === 'co_count' ? 'btn sm active-sort' : 'btn sm secondary';
+  document.getElementById('sort-revenue-btn').className = mode === 'revenue'  ? 'btn sm active-sort' : 'btn sm secondary';
+  // Re-run if results are already showing
+  if (document.getElementById('cs-results-section').style.display !== 'none') {
+    runCrosssell();
+  }
+}
+
 async function runCrosssell() {
   var name     = document.getElementById('combo-cs-name-input').value.trim();
   var sku      = document.getElementById('cs-sku').value.trim();
@@ -917,6 +935,7 @@ async function runCrosssell() {
   if (pid)      params.set('pid',  pid);
   if (dateFrom) params.set('date_from', dateFrom);
   if (dateTo)   params.set('date_to',   dateTo);
+  params.set('sort_by', csSortBy);
   try {
     var res = await fetch(API + '/crosssell?' + params);
     if (!res.ok) { var e = await res.json(); throw new Error(e.detail || res.statusText); }
@@ -932,8 +951,9 @@ async function runCrosssell() {
     var priceNote = data.has_price_data
       ? ' | Revenue ranking active'
       : ' | No price data found - re-upload CSV with Lineitem price & Lineitem quantity columns';
+    var sortNote = ' | Sorted by: ' + (csSortBy === 'revenue' ? 'Primary Revenue' : 'Co-purchase Count');
     document.getElementById('cs-results-meta').textContent =
-      'Secondary found in ' + (data.secondary_order_count || 0).toLocaleString() + ' orders' + dateLabel + priceNote;
+      'Secondary found in ' + (data.secondary_order_count || 0).toLocaleString() + ' orders' + dateLabel + priceNote + sortNote;
     document.getElementById('cs-results-section').style.display = 'block';
     var list = document.getElementById('cs-results-list');
     if (!data.results || !data.results.length) {
