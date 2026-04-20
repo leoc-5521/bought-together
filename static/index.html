@@ -209,8 +209,8 @@
   .toast.show { opacity:1; transform:translateY(0); }
   .toast.error { border-color:var(--danger); color:var(--danger); }
   .toast.success { border-color:var(--accent); color:var(--accent); }
-  #spinner { display:none; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
-  #spinner.visible { display:inline-block; }
+  #spinner, #cs-spinner { display:none; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  #spinner.visible, #cs-spinner.visible { display:inline-block; }
   @keyframes spin { to{transform:rotate(360deg)} }
 </style>
 </head>
@@ -229,6 +229,7 @@
 
 <div class="tab-bar" id="tab-bar">
   <div class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" id="tab-crosssell" onclick="switchTab('crosssell')">💡 Cross-sell</div>
   <div class="tab" id="tab-search" onclick="switchTab('search')">🔍 Search</div>
 </div>
 
@@ -355,6 +356,59 @@
   </div><!-- /dashboard -->
 
 
+
+  <!-- cross-sell page -->
+  <div class="page" id="page-crosssell">
+    <div class="section-label" style="margin-bottom:8px;">Cross-sell finder</div>
+    <div class="help-text" style="margin-bottom:20px;">
+      <strong>How it works:</strong> Type the product you want to cross-sell (the <em>secondary</em> product).<br>
+      Results show <strong>primary products</strong> — products with higher total lifetime revenue — that were bought in the same order, ranked by co-purchase count.<br>
+      Re-upload your CSV with <strong>Lineitem price</strong> and <strong>Lineitem quantity</strong> columns for revenue ranking to work.
+    </div>
+    <div class="search-grid">
+      <div class="field">
+        <label>Secondary Product Name</label>
+        <div class="combo-wrap">
+          <input type="text" class="combo-input" id="combo-cs-name-input" placeholder="Type to search products..." autocomplete="off" />
+          <button class="combo-clear" id="combo-cs-name-clear" onclick="clearCombo('cs-name')" tabindex="-1">&times;</button>
+          <span class="combo-arrow">&#9660;</span>
+          <div class="combo-dropdown" id="combo-cs-name-dropdown"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Secondary Variant SKU</label>
+        <input type="text" id="cs-sku" placeholder="e.g. SOCK-WHT-M" />
+      </div>
+      <div class="field">
+        <label>Secondary Product ID</label>
+        <input type="text" id="cs-id" placeholder="e.g. 12345678" />
+      </div>
+      <div class="field"></div>
+    </div>
+    <div class="date-filter-row" id="cs-date-row">
+      <div class="field" style="margin-bottom:12px;">
+        <label>Date Range <span style="color:var(--muted);font-weight:normal;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <div class="date-range-widget" id="cs-date-widget">
+          <div class="dr-label">From</div>
+          <div class="dr-part"><input type="date" id="cs-date-from" oninput="onCsDateChange()" /></div>
+          <div class="dr-sep">&rarr;</div>
+          <div class="dr-part"><input type="date" id="cs-date-to" oninput="onCsDateChange()" /></div>
+          <button class="dr-clear hidden" id="cs-dr-clear" onclick="clearCsDate()">&times;</button>
+        </div>
+      </div>
+    </div>
+    <div class="search-actions">
+      <button class="btn" onclick="runCrosssell()" id="cs-btn"><span id="cs-spinner"></span>Find Cross-sell Opportunities</button>
+      <button class="btn secondary" onclick="clearCrosssell()">Clear</button>
+    </div>
+    <div id="cs-results-section" style="display:none;margin-top:28px;">
+      <div class="results-header">
+        <h3>Primary products to cross-sell <span id="cs-results-query"></span></h3>
+        <div class="results-meta" id="cs-results-meta"></div>
+      </div>
+      <div id="cs-results-list"></div>
+    </div>
+  </div>
 
   <!-- ══ SEARCH PAGE ══ -->
   <div class="page" id="page-search">
@@ -697,7 +751,7 @@ async function uploadFile(file) {
 
 function showMapper(headers,detected){
   const grid=document.getElementById('mapper-grid'); grid.innerHTML='';
-  [['order_id','Order ID *'],['product_name','Product Name *'],['sku','SKU'],['product_id','Product ID'],['product_type','Product Type'],['created_at','Order Date']].forEach(([k,lbl])=>{
+  [['order_id','Order ID *'],['product_name','Product Name *'],['sku','SKU'],['product_id','Product ID'],['product_type','Product Type'],['created_at','Order Date'],['price','Lineitem Price'],['quantity','Lineitem Quantity']].forEach(([k,lbl])=>{
     const di=detected[k]!==undefined?detected[k]:'';
     const div=document.createElement('div'); div.className='field';
     div.innerHTML=`<label>${lbl}</label><select id="map-${k}"><option value="">— not mapped —</option>${headers.map((h,i)=>`<option value="${i}"${di===i?' selected':''}>${h}</option>`).join('')}</select>`;
@@ -712,7 +766,7 @@ async function submitWithMapping(){
   if(!oic&&oic!=='0'){showToast('Order ID column is required','error');return;}
   if(!nc&&nc!=='0'){showToast('Product Name column is required','error');return;}
   showProgress(true,'Processing…',30);
-  const params=new URLSearchParams({order_id_col:oic,product_name_col:nc,sku_col:g('map-sku')||-1,product_id_col:g('map-product_id')||-1,product_type_col:g('map-product_type')||-1,date_col:g('map-created_at')||-1});
+  const params=new URLSearchParams({order_id_col:oic,product_name_col:nc,sku_col:g('map-sku')||-1,product_id_col:g('map-product_id')||-1,product_type_col:g('map-product_type')||-1,date_col:g('map-created_at')||-1,price_col:g('map-price')||-1,quantity_col:g('map-quantity')||-1});
   const form=new FormData(); form.append('file',pendingFile);
   try{
     const res=await fetch(`${API}/upload-with-mapping?${params}`,{method:'POST',body:form});
@@ -736,20 +790,22 @@ function applyStats(data) {
   if (data.has_dates && data.min_date && data.max_date) {
     document.getElementById('stat-date-box').style.display = 'block';
     document.getElementById('stat-date-range').textContent = `${formatDate(data.min_date)} –\n${formatDate(data.max_date)}`;
-    ['dash-date-from','dash-date-to','s-date-from','s-date-to'].forEach(id=>{
+    ['dash-date-from','dash-date-to','s-date-from','s-date-to','cs-date-from','cs-date-to'].forEach(id=>{
       const el=document.getElementById(id);
       el.min=data.min_date; el.max=data.max_date; el.value='';
     });
     document.getElementById('dash-date-row').style.display  = 'block';
     document.getElementById('search-date-row').classList.add('visible');
+    document.getElementById('cs-date-row').classList.add('visible');
   } else {
     document.getElementById('stat-date-box').style.display='none';
     document.getElementById('dash-date-row').style.display='none';
     document.getElementById('search-date-row').classList.remove('visible');
+    document.getElementById('cs-date-row').classList.remove('visible');
   }
 
   allNames=data.names||[]; allTypes=data.types||[];
-  initCombo('name',allNames); initCombo('type',allTypes); initCombo('tvt',allTypes);
+  initCombo('name',allNames); initCombo('type',allTypes); initCombo('tvt',allTypes); initCombo('cs-name',allNames);
 
   document.getElementById('stats-bar').classList.add('visible');
   document.getElementById('upload-page').style.display='none';
@@ -841,6 +897,86 @@ function showProgress(show,label='',pct=0){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 let toastTimer;
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3500);}
+
+// ── Cross-sell ────────────────────────────────────────────────
+function onCsDateChange() { makeDateHandler('cs-date-widget','cs-dr-clear')(); }
+function clearCsDate() { clearDateWidget('cs-date-from','cs-date-to','cs-date-widget','cs-dr-clear'); }
+
+async function runCrosssell() {
+  var name     = document.getElementById('combo-cs-name-input').value.trim();
+  var sku      = document.getElementById('cs-sku').value.trim();
+  var pid      = document.getElementById('cs-id').value.trim();
+  var dateFrom = document.getElementById('cs-date-from').value;
+  var dateTo   = document.getElementById('cs-date-to').value;
+  if (!name && !sku && !pid) { showToast('Enter a secondary product to search for', 'error'); return; }
+  document.getElementById('cs-spinner').classList.add('visible');
+  document.getElementById('cs-btn').disabled = true;
+  var params = new URLSearchParams();
+  if (name)     params.set('name', name);
+  if (sku)      params.set('sku',  sku);
+  if (pid)      params.set('pid',  pid);
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo)   params.set('date_to',   dateTo);
+  try {
+    var res = await fetch(API + '/crosssell?' + params);
+    if (!res.ok) { var e = await res.json(); throw new Error(e.detail || res.statusText); }
+    var data = await res.json();
+    var query = name || sku || pid;
+    document.getElementById('cs-results-query').textContent = '"' + query + '"';
+    var dateLabel = '';
+    if (dateFrom || dateTo) {
+      var f = dateFrom ? formatDate(dateFrom) : 'start';
+      var t = dateTo   ? formatDate(dateTo)   : 'present';
+      dateLabel = ' | ' + f + ' to ' + t;
+    }
+    var priceNote = data.has_price_data
+      ? ' | Revenue ranking active'
+      : ' | No price data found - re-upload CSV with Lineitem price & Lineitem quantity columns';
+    document.getElementById('cs-results-meta').textContent =
+      'Secondary found in ' + (data.secondary_order_count || 0).toLocaleString() + ' orders' + dateLabel + priceNote;
+    document.getElementById('cs-results-section').style.display = 'block';
+    var list = document.getElementById('cs-results-list');
+    if (!data.results || !data.results.length) {
+      list.innerHTML = '<div class="dash-empty">No primary products found — this product may always be bought alone, or all co-purchased products have lower revenue.</div>';
+    } else {
+      var maxCount = data.results[0].co_count;
+      list.innerHTML = data.results.map(function(r, i) {
+        var revTag = r.total_revenue > 0
+          ? '<span>Total revenue: ' + r.total_revenue.toLocaleString('en-IE', {style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:0}) + '</span>'
+          : '';
+        return '<div class="product-card">' +
+          '<div>' +
+            '<div class="pc-rank">#' + (i+1) + '</div>' +
+            '<div class="pc-name">' + esc(r.name) + '</div>' +
+            '<div class="pc-meta">' +
+              (r.sku  ? '<span>' + esc(r.sku)  + '</span>' : '') +
+              (r.type ? '<span>' + esc(r.type) + '</span>' : '') +
+              revTag +
+              '<span style="color:var(--muted)">Total orders: ' + r.primary_total.toLocaleString() + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="pc-right">' +
+            '<div class="pc-pct" style="font-size:22px;">' + r.co_count.toLocaleString() + '</div>' +
+            '<div class="pc-count">' + r.pct + '% of its orders</div>' +
+          '</div>' +
+          '<div class="bar-wrap"><div class="bar-fill" style="width:' + Math.round(r.co_count / maxCount * 100) + '%"></div></div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch(err) {
+    showToast('Search failed: ' + err.message, 'error');
+  } finally {
+    document.getElementById('cs-spinner').classList.remove('visible');
+    document.getElementById('cs-btn').disabled = false;
+  }
+}
+
+function clearCrosssell() {
+  clearCombo('cs-name');
+  ['cs-sku', 'cs-id'].forEach(function(id) { document.getElementById(id).value = ''; });
+  clearCsDate();
+  document.getElementById('cs-results-section').style.display = 'none';
+}
 
 // ── On load: restore if server has data ───────────────────────
 (async()=>{
