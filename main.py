@@ -542,6 +542,7 @@ def crosssell(
     date_from: Optional[str] = Query(None),
     date_to:   Optional[str] = Query(None),
     limit:     int           = Query(50),
+    sort_by:   str           = Query("co_count"),  # "co_count" or "revenue"
 ):
     if not orders_map:
         raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
@@ -631,7 +632,8 @@ def crosssell(
             for k in primary_data
             if primary_with_sec[k] > 0
         ],
-        key=lambda x: (-x["co_count"], -x["pct"])
+        key=lambda x: (-x["total_revenue"], -x["co_count"]) if sort_by == "revenue"
+             else (-x["co_count"], -x["pct"])
     )[:limit]
 
     return {
