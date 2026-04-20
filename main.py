@@ -26,10 +26,10 @@ app.add_middleware(
 # ── Persistent storage ───────────────────────────────────────────
 DATA_FILE = "/tmp/orders_data.pkl"
 
-def save_to_disk(om, s):
+def save_to_disk(om, s, pr=None):
     try:
         with open(DATA_FILE, "wb") as f:
-            pickle.dump({"orders_map": om, "stats": s}, f, protocol=4)
+            pickle.dump({"orders_map": om, "stats": s, "product_revenue": pr or {}}, f, protocol=4)
     except Exception as e:
         print(f"Warning: could not save to disk: {e}")
 
@@ -38,12 +38,12 @@ def load_from_disk():
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, "rb") as f:
                 data = pickle.load(f)
-                return data["orders_map"], data["stats"]
+                return data["orders_map"], data["stats"], data.get("product_revenue", {})
     except Exception as e:
         print(f"Warning: could not load from disk: {e}")
-    return {}, {}
+    return {}, {}, {}
 
-orders_map, stats = load_from_disk()
+orders_map, stats, product_revenue = load_from_disk()
 
 FIELD_SYNONYMS = {
     "order_id":    ["order id","name","order name","order_id","order number","order_no"],
@@ -52,6 +52,8 @@ FIELD_SYNONYMS = {
     "product_id":  ["product id","product_id"],
     "product_type":["product type","product_type","type","vendor"],
     "created_at":  ["created at","created_at","order date","date","processed at","processed_at"],
+    "price":       ["lineitem price","line item price","price","item price","unit price","lineitem_price"],
+    "quantity":    ["lineitem quantity","line item quantity","quantity","qty","lineitem_quantity"],
 }
 
 DATE_FORMATS = [
@@ -108,17 +110,17 @@ def in_date_range(order, df, dt):
 # ── Upload endpoints ─────────────────────────────────────────────
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    global orders_map, stats
+    global orders_map, stats, product_revenue
     content = await file.read()
     headers, rows = parse_csv_bytes(content)
     del content  # free memory immediately
     col_map = detect_columns(headers)
     if "order_id" not in col_map or "product_name" not in col_map:
         return {"status": "needs_mapping", "headers": headers, "col_map": col_map, "row_count": len(rows)}
-    orders_map, stats = build_orders_map(rows, col_map)
+    orders_map, stats, product_revenue = build_orders_map(rows, col_map)
     del rows
     gc.collect()
-    save_to_disk(orders_map, stats)
+    save_to_disk(orders_map, stats, product_revenue)
     return {"status": "ok", **stats}
 
 class MappingRequest(BaseModel):
@@ -135,8 +137,10 @@ async def upload_with_mapping(
     product_id_col: int = Query(-1),
     product_type_col: int = Query(-1),
     date_col: int = Query(-1),
+    price_col: int = Query(-1),
+    quantity_col: int = Query(-1),
 ):
-    global orders_map, stats
+    global orders_map, stats, product_revenue
     content = await file.read()
     _, rows = parse_csv_bytes(content)
     del content
@@ -145,10 +149,12 @@ async def upload_with_mapping(
     if product_id_col >= 0:   col_map["product_id"] = product_id_col
     if product_type_col >= 0: col_map["product_type"] = product_type_col
     if date_col >= 0:         col_map["created_at"] = date_col
-    orders_map, stats = build_orders_map(rows, col_map)
+    if price_col >= 0:        col_map["price"] = price_col
+    if quantity_col >= 0:     col_map["quantity"] = quantity_col
+    orders_map, stats, product_revenue = build_orders_map(rows, col_map)
     del rows
     gc.collect()
-    save_to_disk(orders_map, stats)
+    save_to_disk(orders_map, stats, product_revenue)
     return {"status": "ok", **stats}
 
 def build_orders_map(rows, col_map):
@@ -169,8 +175,19 @@ def build_orders_map(rows, col_map):
             continue
         sku = get(row, "sku"); pid = get(row, "product_id")
         ptype = get(row, "product_type"); raw_date = get(row, "created_at")
+        raw_price = get(row, "price"); raw_qty = get(row, "quantity")
         if om[order_id]["date"] is None and raw_date:
             om[order_id]["date"] = parse_date(raw_date)
+        try:
+            line_price = float(str(raw_price).replace(",","").strip()) if raw_price else 0.0
+        except (ValueError, TypeError):
+            line_price = 0.0
+        try:
+            line_qty = float(str(raw_qty).replace(",","").strip()) if raw_qty else 1.0
+            if line_qty <= 0: line_qty = 1.0
+        except (ValueError, TypeError):
+            line_qty = 1.0
+        line_revenue = line_price * line_qty
         key = f"{name}|{sku}"
         existing_keys = {p["_key"] for p in om[order_id]["products"]}
         if key not in existing_keys:
@@ -179,7 +196,14 @@ def build_orders_map(rows, col_map):
             if sku:   p["sku"]  = sku
             if pid:   p["id"]   = pid
             if ptype: p["type"] = ptype
+            p["line_revenue"] = line_revenue
             om[order_id]["products"].append(p)
+        else:
+            # Accumulate revenue for same product appearing multiple times (different variants)
+            for existing in om[order_id]["products"]:
+                if existing["_key"] == key:
+                    existing["line_revenue"] = existing.get("line_revenue", 0.0) + line_revenue
+                    break
 
     om = dict(om)
 
@@ -191,18 +215,26 @@ def build_orders_map(rows, col_map):
             if p.get("type"): all_types.add(p["type"])
         if order["date"]: all_dates.append(order["date"])
 
+    # Build global product revenue lookup: key -> total revenue across all orders
+    product_revenue: dict[str, float] = defaultdict(float)
+    for order in om.values():
+        for p in order["products"]:
+            product_revenue[p["_key"]] += p.get("line_revenue", 0.0)
+    has_price_data = any(v > 0 for v in product_revenue.values())
+
     s = {
-        "order_count":   len(om),
-        "product_count": len(all_names),
-        "sku_count":     len(all_skus),
-        "type_count":    len(all_types),
-        "types":         sorted(all_types),
-        "names":         sorted(all_names),
-        "min_date":      str(min(all_dates)) if all_dates else None,
-        "max_date":      str(max(all_dates)) if all_dates else None,
-        "has_dates":     bool(all_dates),
+        "order_count":    len(om),
+        "product_count":  len(all_names),
+        "sku_count":      len(all_skus),
+        "type_count":     len(all_types),
+        "types":          sorted(all_types),
+        "names":          sorted(all_names),
+        "min_date":       str(min(all_dates)) if all_dates else None,
+        "max_date":       str(max(all_dates)) if all_dates else None,
+        "has_dates":      bool(all_dates),
+        "has_price_data": has_price_data,
     }
-    return om, s
+    return om, s, dict(product_revenue)
 
 def get_p(p, field):
     """Safe field getter for product dicts (some fields may be missing if empty)."""
@@ -497,6 +529,116 @@ def search(
     )[:limit]
 
     return {"match_count": total, "results": results}
+
+# ── Cross-sell endpoint ─────────────────────────────────────────
+# Search for a SECONDARY product. Primary = any product with higher
+# global total revenue (price x qty summed across all orders).
+# Ranked by co-purchase count (how many orders had both).
+@app.get("/crosssell")
+def crosssell(
+    name:      Optional[str] = Query(None),
+    sku:       Optional[str] = Query(None),
+    pid:       Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to:   Optional[str] = Query(None),
+    limit:     int           = Query(50),
+):
+    if not orders_map:
+        raise HTTPException(status_code=404, detail="No data loaded. Please upload a file first.")
+
+    nl = (name or "").lower()
+    sl = (sku  or "").lower()
+    il = (pid  or "").lower()
+    if not any([nl, sl, il]):
+        raise HTTPException(status_code=400, detail="Provide at least one search term")
+
+    df = parse_date(date_from) if date_from else None
+    dt = parse_date(date_to)   if date_to   else None
+    has_price = any(v > 0 for v in product_revenue.values()) if product_revenue else False
+
+    def is_secondary(p):
+        return ((nl and nl in p["name"].lower()) or
+                (sl and sl in get_p(p, "sku").lower()) or
+                (il and il in get_p(p, "id").lower()))
+
+    # Get secondary's global revenue (0 if no price data)
+    secondary_revenue = 0.0
+    for k, rev in product_revenue.items():
+        pk = k.split("|")[0].lower()  # product name from key
+        if nl and nl in pk:
+            secondary_revenue = max(secondary_revenue, rev)
+        # Also check by sku
+    # More precise: find secondary key from orders_map
+    secondary_keys = set()
+    for order in orders_map.values():
+        for p in order["products"]:
+            if is_secondary(p):
+                secondary_keys.add(p["_key"])
+    secondary_max_revenue = max((product_revenue.get(k, 0.0) for k in secondary_keys), default=0.0)
+
+    primary_total:    dict[str, int]  = defaultdict(int)
+    primary_with_sec: dict[str, int]  = defaultdict(int)
+    primary_data:     dict[str, dict] = {}
+    secondary_order_count = 0
+
+    for order in orders_map.values():
+        if not in_date_range(order, df, dt):
+            continue
+        products = order["products"]
+        has_sec = any(is_secondary(p) for p in products)
+        if has_sec:
+            secondary_order_count += 1
+
+        for p in products:
+            if is_secondary(p):
+                continue
+            k = p["_key"]
+            p_rev = product_revenue.get(k, 0.0)
+
+            # If price data exists: only count as primary if its total revenue
+            # is greater than or equal to the secondary's total revenue.
+            # If no price data: all co-purchased products qualify as primary.
+            if has_price and secondary_max_revenue > 0 and p_rev < secondary_max_revenue:
+                continue
+
+            primary_total[k] += 1
+            if has_sec:
+                primary_with_sec[k] += 1
+            if k not in primary_data:
+                primary_data[k] = {
+                    "name":          p["name"],
+                    "sku":           get_p(p, "sku"),
+                    "id":            get_p(p, "id"),
+                    "type":          get_p(p, "type"),
+                    "total_revenue": round(product_revenue.get(k, 0.0), 2),
+                }
+
+    if secondary_order_count == 0:
+        return {"secondary_order_count": 0, "has_price_data": has_price, "results": []}
+
+    results = sorted(
+        [
+            {
+                "name":          primary_data[k]["name"],
+                "sku":           primary_data[k]["sku"],
+                "id":            primary_data[k]["id"],
+                "type":          primary_data[k]["type"],
+                "total_revenue": primary_data[k]["total_revenue"],
+                "primary_total": primary_total[k],
+                "co_count":      primary_with_sec[k],
+                "pct":           round(primary_with_sec[k] / primary_total[k] * 100, 1),
+            }
+            for k in primary_data
+            if primary_with_sec[k] > 0
+        ],
+        key=lambda x: (-x["co_count"], -x["pct"])
+    )[:limit]
+
+    return {
+        "secondary_order_count": secondary_order_count,
+        "has_price_data": has_price,
+        "results": results,
+    }
 
 # ── Serve frontend ───────────────────────────────────────────────
 if os.path.exists("static"):
