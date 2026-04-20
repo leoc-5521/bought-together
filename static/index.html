@@ -1057,7 +1057,6 @@ async function runProductTrios() {
     if (!res.ok) { var e = await res.json(); throw new Error(e.detail || res.statusText); }
     var data = await res.json();
     var query = name || sku;
-    document.getElementById('pt-results-query').textContent = '"' + query + '"';
     var dashFrom = document.getElementById('dash-date-from').value;
     var dashTo   = document.getElementById('dash-date-to').value;
     var dateLabel = '';
@@ -1067,7 +1066,7 @@ async function runProductTrios() {
       dateLabel = ' · ' + f + ' to ' + t;
     }
     document.getElementById('pt-results-meta').textContent =
-      'Product found in ' + (data.anchor_orders || 0).toLocaleString() + ' orders with 3+ items' +
+      '"' + query + '" found in ' + (data.anchor_orders || 0).toLocaleString() + ' orders with 3+ items' +
       dateLabel + ' · ' + (data.trios ? data.trios.length : 0).toLocaleString() + ' trios found';
     var list = document.getElementById('pt-results-list');
     if (!data.trios || !data.trios.length) {
